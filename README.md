@@ -28,29 +28,13 @@ USDC token for donor funding: 0xcebA9300f2b948710d2653dD7B07f33A8B32118C
 USDC feeCurrency adapter for relayer txs: 0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B
 ```
 
-Celo Sepolia:
-
-```text
-Chain ID: 11142220
-RPC: https://forno.celo-sepolia.celo-testnet.org
-```
-
-Use Sepolia for the hackathon demo unless the relayer wallet, Zavu sender, and contract are production-ready.
-
 ## Block 1: Deploy Contract
 
 Install Foundry, then deploy with the provided script:
 
 ```powershell
 $env:DEPLOYER_PRIVATE_KEY = "0x..."
-.\scripts\deploy-contract.ps1 -Network sepolia
-```
-
-Mainnet deployment:
-
-```powershell
-$env:DEPLOYER_PRIVATE_KEY = "0x..."
-.\scripts\deploy-contract.ps1 -Network mainnet
+.\scripts\deploy-contract.ps1
 ```
 
 The script deploys:
@@ -69,11 +53,9 @@ After deploy:
 ```bash
 cast send <CONTRACT_ADDRESS> \
   "setSubmitter(address,bool)" <RELAYER_ADDRESS> true \
-  --rpc-url https://forno.celo-sepolia.celo-testnet.org \
+  --rpc-url https://forno.celo.org \
   --private-key $DEPLOYER_PRIVATE_KEY
 ```
-
-For mainnet, use `https://forno.celo.org`.
 
 ## Block 2: Configure Browser App
 
@@ -103,7 +85,7 @@ Set secrets:
 
 ```bash
 zavu fn secrets set SENDER_ID <zavu_sender_id>
-zavu fn secrets set CELO_RPC_URL https://forno.celo-sepolia.celo-testnet.org
+zavu fn secrets set CELO_RPC_URL https://forno.celo.org
 zavu fn secrets set AIDTRACE_CONTRACT <deployed_contract_address>
 zavu fn secrets set RELAYER_PRIVATE_KEY 0x...
 zavu fn secrets set APP_BASE_URL https://your-aidtrace-url.example
@@ -155,7 +137,7 @@ Useful checks:
 ```bash
 zavu fn invoke --event message.inbound --data '{"from":"+584121234567","text":"AT DELIVER AT-DEMO-001 REFUGIO 20 water boxes","messageId":"local-test-1","channel":"sms"}'
 zavu fn logs --tail
-cast logs --address <CONTRACT_ADDRESS> --rpc-url https://forno.celo-sepolia.celo-testnet.org
+cast logs --address <CONTRACT_ADDRESS> --rpc-url https://forno.celo.org
 ```
 
 ## Payment Notes

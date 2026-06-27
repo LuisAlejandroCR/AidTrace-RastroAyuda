@@ -20,14 +20,6 @@ const abi = [
 ] as const;
 
 const zeroAddress = "0x0000000000000000000000000000000000000000" as const;
-const aidTraceSepolia = {
-  id: 11142220,
-  name: "Celo Sepolia",
-  nativeCurrency: { name: "CELO", symbol: "CELO", decimals: 18 },
-  rpcUrls: {
-    default: { http: ["https://forno.celo-sepolia.celo-testnet.org"] },
-  },
-} as const;
 
 function bytes32Text(value: string) {
   return pad(toBytes(value.toUpperCase().slice(0, 31)), { size: 32 });
@@ -71,11 +63,10 @@ export default defineFunction(async (event, ctx) => {
   const rpcUrl = process.env.CELO_RPC_URL!;
   const contract = process.env.AIDTRACE_CONTRACT as `0x${string}`;
   const account = privateKeyToAccount(process.env.RELAYER_PRIVATE_KEY as `0x${string}`);
-  const chain = rpcUrl.includes("sepolia") ? aidTraceSepolia : celo;
 
   const client = createWalletClient({
     account,
-    chain,
+    chain: celo,
     transport: http(rpcUrl),
   });
 
