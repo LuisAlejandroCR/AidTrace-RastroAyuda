@@ -1,14 +1,11 @@
-# Dependencies
 node_modules/
 **/node_modules/
 
-# Environment / secrets
 .env
 .env.local
 .env.*
 !.env.example
 
-# Build outputs
 dist/
 build/
 .vite/
@@ -16,16 +13,12 @@ build/
 work/
 outputs/
 
-# Logs
 *.log
 
-# OS files
 .DS_Store
 Thumbs.db
 
-# Project-generated files
 skills-lock.json
-
 
 qr-lib/
 selector-check/
