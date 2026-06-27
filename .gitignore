@@ -13,6 +13,10 @@ build/
 work/
 outputs/
 
+out/
+cache/
+broadcast/
+
 *.log
 
 .DS_Store
@@ -22,3 +26,5 @@ skills-lock.json
 
 qr-lib/
 selector-check/
+zavu/**/.env
+zavu/**/.zavu/credentials.json

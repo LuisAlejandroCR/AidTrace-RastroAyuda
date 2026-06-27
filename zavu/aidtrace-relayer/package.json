@@ -1,0 +1,9 @@
+{
+  "name": "aidtrace-relayer",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@zavu/functions": "latest",
+    "viem": "latest"
+  }
+}
