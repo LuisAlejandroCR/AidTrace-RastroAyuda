@@ -19,7 +19,7 @@ Field users do not need a wallet and do not manually sync.
 
 ## Zavu SMS / WhatsApp flow
 
-Use Zavu as the communications and ingestion layer:
+Yes, this can work on 2G/3G through WhatsApp or SMS. Use Zavu as the communications and ingestion layer:
 
 1. Field user sends WhatsApp or SMS to the AidTrace number.
 2. Zavu receives the inbound message and forwards it to an AidTrace webhook.
@@ -34,6 +34,8 @@ AT REVIEW AT-ABC-123 missing 2 boxes
 4. The webhook normalizes the action into the same event schema used by the PWA.
 5. The webhook stores the full event off-chain and submits only the proof hash to Celo.
 6. Zavu replies with a confirmation message and the batch code.
+
+For low bandwidth, keep commands short and text-only. Avoid photos unless needed for proof review.
 
 Zavu rules to respect:
 
@@ -57,6 +59,17 @@ Recommended relay flow:
 6. Relayer sends confirmation through Zavu.
 
 This keeps Celo behind the tracking flow while preserving public auditability.
+
+## App configuration
+
+The field UI intentionally has no Settings screen. Configure deployment values in `app.js` before release:
+
+```js
+const CONTRACT_ADDRESS = "0x...";
+const RELAY_ENDPOINT = "https://your-zavu-or-backend-webhook.example/sync";
+```
+
+If `RELAY_ENDPOINT` is empty, the app still stores everything locally and shows the offline/queued state, but it cannot auto-sync until configured.
 
 ## Funding wallet and fee standard
 
@@ -135,3 +148,36 @@ New flows should add new action types and schemas off-chain instead of changing 
 
 The on-chain layer stays stable; the UI and Zavu automation can evolve.
 
+## Push to GitHub
+
+From the repo root:
+
+```bash
+git status
+git add .gitignore aidtrace
+git commit -m "Improve AidTrace offline sync and Zavu flow"
+git push origin main
+```
+
+## Local cleanup before push
+
+Keep these files/folders out of the repo:
+
+- `.agents/`
+- `node_modules/`
+- `qr-lib/`
+- `selector-check/`
+- `skills-lock.json`
+- temporary `outputs/` or `work/` folders
+
+The repo should mainly contain:
+
+- `index.html`
+- `styles.css`
+- `app.js`
+- `sw.js`
+- `manifest.webmanifest`
+- `qrcode.js`
+- `AidTraceLedger.sol`
+- `README.md`
+- `.gitignore`

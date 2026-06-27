@@ -25,7 +25,6 @@
       <button class="tab is-active" type="button" data-screen-target="create" data-i18n="navCreate">Create</button>
       <button class="tab" type="button" data-screen-target="update" data-i18n="navUpdate">Update</button>
       <button class="tab" type="button" data-screen-target="timeline" data-i18n="navTimeline">Timeline</button>
-      <button class="tab" type="button" data-screen-target="system" data-i18n="navSystem">System</button>
     </nav>
 
     <main class="screen-shell">
@@ -63,7 +62,7 @@
             <span data-i18n="notes">Notes</span>
             <textarea id="notes" rows="3" data-i18n-placeholder="notesPlaceholder" placeholder="Keep useful, no sensitive personal data."></textarea>
           </label>
-          <button class="primary wide" type="submit" data-i18n="createButton">Create QR and local proof</button>
+          <button class="primary wide" type="submit" data-i18n="createButton">Create QR</button>
         </form>
       </section>
 
@@ -101,7 +100,7 @@
             <span data-i18n="evidence">Evidence note</span>
             <textarea id="eventNote" rows="3" data-i18n-placeholder="evidencePlaceholder" placeholder="Example: Delivered to shelter coordinator Maria."></textarea>
           </label>
-          <button class="primary wide" type="submit" data-i18n="queueButton">Save local proof</button>
+          <button class="primary wide" type="submit" data-i18n="queueButton">Save label</button>
         </form>
       </section>
 
@@ -116,39 +115,7 @@
         <div id="timeline" class="timeline" aria-live="polite"></div>
       </section>
 
-      <section id="screen-system" class="screen" aria-labelledby="system-title">
-        <div class="screen-head">
-          <p class="eyebrow" data-i18n="systemEyebrow">Operations</p>
-          <h2 id="system-title" data-i18n="systemTitle">Automatic sync</h2>
-          <p data-i18n="systemIntro">Field users do not sync manually. AidTrace stores proofs locally and sends them to a Zavu/webhook relayer once internet returns.</p>
-        </div>
-        <div class="panel settings-grid">
-          <label>
-            <span data-i18n="network">Network</span>
-            <select id="networkMode">
-              <option value="sepolia">Celo Sepolia - demo / free testnet</option>
-              <option value="mainnet">Celo Mainnet - sponsor relayer</option>
-            </select>
-          </label>
-          <label>
-            <span data-i18n="contractAddress">Contract address</span>
-            <input id="contractAddress" type="text" placeholder="0x..." />
-          </label>
-          <label class="wide">
-            <span data-i18n="relayEndpoint">Relayer webhook</span>
-            <input id="relayEndpoint" type="url" data-i18n-placeholder="relayPlaceholder" placeholder="https://..." />
-          </label>
-          <button id="saveSettings" class="secondary full" type="button" data-i18n="saveSettings">Save settings</button>
-          <button id="openZavu" class="ghost full" type="button" data-i18n="zavu">Open Zavu messages</button>
-        </div>
-        <dl class="facts">
-          <div><dt data-i18n="fundingWallet">Funding wallet</dt><dd id="adminAddress"></dd></div>
-          <div><dt data-i18n="feeCoin">Network fee coin</dt><dd>USDC on Celo</dd></div>
-          <div><dt data-i18n="status">Status</dt><dd id="networkState">Offline ready</dd></div>
-          <div><dt data-i18n="contract">Contract</dt><dd id="contractDisplay">Set after deploy</dd></div>
-        </dl>
-        <p class="hint" data-i18n="senderHint">Sender still matters: AidTrace stores the field sender and, when synced, the wallet or relayer that submitted the proof.</p>
-      </section>
+      <p id="networkState" class="visually-hidden">Offline ready</p>
     </main>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

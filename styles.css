@@ -101,7 +101,7 @@ h2 {
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   padding: 10px clamp(12px, 4vw, 34px);
   background: rgba(238, 246, 241, 0.86);
@@ -325,6 +325,15 @@ dd {
 
 .toast.is-visible {
   display: block;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 @media (max-width: 760px) {
