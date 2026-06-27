@@ -36,17 +36,24 @@ export default async function handler(req, res) {
       return res.status(200).send("Ignored");
     }
 
-    const { from, channel, text } = event.data || {};
+    const data = event.data || {};
+    const channel = data.channel;
+    const text = data.text;
 
-    if (!from || !channel) {
-      return res.status(400).send("Missing from/channel");
+    const to =
+    channel === "telegram"
+        ? data.telegramChatId
+        : String(data.from || "").replace(/^(sms|whatsapp|telegram):/, "");
+
+    if (!to || !channel) {
+    return res.status(400).send("Missing recipient/channel");
     }
 
     await zavu.messages.send({
-      to: from,
-      channel,
-      text: buildReply(text),
-      idempotencyKey: `aidtrace-reply-${event.id}`,
+    to,
+    channel,
+    text: buildReply(text),
+    idempotencyKey: `aidtrace-reply-${event.id}`,
     });
 
     return res.status(200).send("OK");
