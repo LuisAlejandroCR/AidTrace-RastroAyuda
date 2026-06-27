@@ -135,13 +135,3 @@ New flows should add new action types and schemas off-chain instead of changing 
 
 The on-chain layer stays stable; the UI and Zavu automation can evolve.
 
-## Push to GitHub
-
-From the repo root:
-
-```bash
-git status
-git add .gitignore aidtrace
-git commit -m "Improve AidTrace offline sync and Zavu flow"
-git push origin main
-```
