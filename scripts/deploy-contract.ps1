@@ -22,6 +22,7 @@ Write-Host "RPC: $RpcUrl"
 Write-Host "Admin: $Admin"
 
 forge create `
+  --broadcast `
   --rpc-url $RpcUrl `
   --private-key $privateKey `
   AidTraceLedger.sol:AidTraceLedger `

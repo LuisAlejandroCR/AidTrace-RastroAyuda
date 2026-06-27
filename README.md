@@ -33,9 +33,11 @@ USDC feeCurrency adapter for relayer txs: 0x2F25deB3848C207fc8E0c34035B3Ba7fC157
 Install Foundry, then deploy with the provided script:
 
 ```powershell
-$env:DEPLOYER_PRIVATE_KEY = "0x..."
+$env:RastroAyuda_Admin_PRIVATE_KEY = "0x..."
 .\scripts\deploy-contract.ps1
 ```
+
+The deploy script must broadcast the transaction. If Foundry prints `Dry run enabled, not broadcasting transaction`, your local script is missing `--broadcast`; pull the latest script and rerun the block above.
 
 The script deploys:
 
@@ -50,11 +52,11 @@ After deploy:
 2. Set `CONTRACT_ADDRESS` in `app.js`.
 3. Add the relayer wallet as submitter if it is different from the admin wallet.
 
-```bash
-cast send <CONTRACT_ADDRESS> \
-  "setSubmitter(address,bool)" <RELAYER_ADDRESS> true \
-  --rpc-url https://forno.celo.org \
-  --private-key $DEPLOYER_PRIVATE_KEY
+```powershell
+cast send <CONTRACT_ADDRESS> `
+  "setSubmitter(address,bool)" <RELAYER_ADDRESS> true `
+  --rpc-url https://forno.celo.org `
+  --private-key $env:RastroAyuda_Admin_PRIVATE_KEY
 ```
 
 ## Block 2: Configure Browser App
