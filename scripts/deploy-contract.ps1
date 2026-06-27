@@ -1,7 +1,7 @@
 param(
   [string] $Admin = "0x326F24884FAFA1810034F4F6Dd41d280fB500569",
 
-  [string] $PrivateKeyEnv = "DEPLOYER_PRIVATE_KEY",
+  [string] $PrivateKeyEnv = "RastroAyuda_Admin_PRIVATE_KEY",
 
   [string] $RpcUrl = "https://forno.celo.org"
 )
