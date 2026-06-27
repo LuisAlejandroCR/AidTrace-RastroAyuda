@@ -336,6 +336,54 @@ dd {
   white-space: nowrap;
 }
 
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .app-header,
+  .tabbar,
+  .screen-head,
+  #screen-create,
+  #screen-update,
+  .toast,
+  .visually-hidden {
+    display: none !important;
+  }
+
+  .screen-shell {
+    width: 100%;
+    padding: 0;
+  }
+
+  #screen-timeline {
+    display: block !important;
+  }
+
+  .timeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10mm;
+  }
+
+  .timeline-item {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #111;
+    border-radius: 0;
+    padding: 8mm;
+  }
+
+  .tag {
+    background: #fff;
+    border: 1px solid #111;
+  }
+
+  .tag svg {
+    width: 34mm;
+    height: 34mm;
+  }
+}
+
 @media (max-width: 760px) {
   .app-header {
     align-items: start;

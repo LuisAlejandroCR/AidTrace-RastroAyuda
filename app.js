@@ -1,7 +1,7 @@
 const FUNDING_WALLET = "0x326F24884FAFA1810034F4F6Dd41d280fB500569";
 const USDC_TOKEN_ADDRESS = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C";
 const USDC_FEE_CURRENCY = "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B";
-const CONTRACT_ADDRESS = "0x326F24884FAFA1810034F4F6Dd41d280fB500569"; //RastroAyuda_Admin wallet address
+const CONTRACT_ADDRESS = ""; // Set to the deployed AidTraceLedger contract address.
 const RELAY_ENDPOINT = "";
 const STORE_KEY = "aidtrace_state_v4";
 
@@ -22,7 +22,7 @@ const translations = {
     navTimeline: "Timeline",
     createEyebrow: "Start a trace",
     createTitle: "New aid batch",
-    createIntro: "Create a QR code and label first. AidTrace stores the proof locally if internet is weak.",
+    createIntro: "Create a QR label first. Phone cameras can read it and reopen this batch automatically.",
     updateEyebrow: "Field action",
     updateTitle: "Record custody event",
     updateIntro: "Use the QR code, typed code, WhatsApp, or SMS to record what happened.",
@@ -76,7 +76,7 @@ const translations = {
     navTimeline: "Historial",
     createEyebrow: "Iniciar trazabilidad",
     createTitle: "Nuevo lote de ayuda",
-    createIntro: "Primero crea el QR y la etiqueta. AidTrace guarda la prueba local si la red es debil.",
+    createIntro: "Primero crea la etiqueta QR. La camara del telefono puede leerla y reabrir este lote automaticamente.",
     updateEyebrow: "Accion en campo",
     updateTitle: "Registrar evento de custodia",
     updateIntro: "Usa el QR, codigo escrito, WhatsApp o SMS para registrar lo ocurrido.",
@@ -179,6 +179,13 @@ function qrSvg(text) {
   qr.addData(text);
   qr.make();
   return qr.createSvgTag(3, 1);
+}
+
+function batchLink(batchId) {
+  const url = new URL(window.location.href);
+  url.hash = "";
+  url.searchParams.set("batch", batchId);
+  return url.toString();
 }
 
 async function queueEvent(payload) {
@@ -350,7 +357,7 @@ function render() {
   for (const event of state.events) {
     const node = template.content.cloneNode(true);
     const tag = node.querySelector(".tag");
-    tag.innerHTML = `${qrSvg(event.batchId)}<span>${event.batchId}</span>`;
+    tag.innerHTML = `${qrSvg(batchLink(event.batchId))}<span>${event.batchId}</span>`;
     node.querySelector("h3").textContent = `${event.actionType.replaceAll("_", " ")} - ${event.status}`;
     node.querySelector("p").textContent = `${event.senderName} - ${event.locationText}. ${event.note || ""}`.trim();
     node.querySelector("small").textContent = event.syncedAt
@@ -358,6 +365,14 @@ function render() {
       : `Local proof ${short(event.dataHash)} - ${new Date(event.createdAt).toLocaleString()}`;
     timeline.appendChild(node);
   }
+}
+
+function hydrateBatchFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const batchId = params.get("batch");
+  if (!batchId) return;
+  $("eventBatchId").value = batchId;
+  showScreen("update");
 }
 
 document.querySelectorAll("[data-screen-target]").forEach((button) => {
@@ -397,3 +412,4 @@ if ("serviceWorker" in navigator) {
 }
 
 render();
+hydrateBatchFromUrl();

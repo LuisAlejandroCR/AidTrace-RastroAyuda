@@ -17,6 +17,15 @@ The app is UI-first:
 
 Field users do not need a wallet and do not manually sync.
 
+## QR strategy
+
+AidTrace should support both printing and reading QR codes.
+
+- **Print QR**: the QR is the physical label for a box, pallet, medicine kit, or convoy manifest.
+- **Read QR**: field users scan the QR with the phone camera; it opens AidTrace with the batch code already filled.
+
+The QR encodes a URL with `?batch=AT-...`, not only raw text. If the phone camera cannot open the app, the visible `AT-...` code can still be typed manually or sent by SMS/WhatsApp.
+
 ## Zavu SMS / WhatsApp flow
 
 Yes, this can work on 2G/3G through WhatsApp or SMS. Use Zavu as the communications and ingestion layer:
@@ -65,11 +74,13 @@ This keeps Celo behind the tracking flow while preserving public auditability.
 The field UI intentionally has no Settings screen. Configure deployment values in `app.js` before release:
 
 ```js
-const CONTRACT_ADDRESS = "0x...";
+const CONTRACT_ADDRESS = "0x..."; // Deployed AidTraceLedger contract.
 const RELAY_ENDPOINT = "https://your-zavu-or-backend-webhook.example/sync";
 ```
 
 If `RELAY_ENDPOINT` is empty, the app still stores everything locally and shows the offline/queued state, but it cannot auto-sync until configured.
+
+Do not set `CONTRACT_ADDRESS` to the funding wallet. It must be the deployed `AidTraceLedger` contract address.
 
 ## Funding wallet and fee standard
 
