@@ -1,15 +1,15 @@
 const FUNDING_WALLET = "0x326F24884FAFA1810034F4F6Dd41d280fB500569";
 const USDC_TOKEN_ADDRESS = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C";
 const USDC_FEE_CURRENCY = "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B";
-const CONTRACT_ADDRESS = ""; // Set to the deployed AidTraceLedger contract address.
+const CONTRACT_ADDRESS = "0xaf5c40e82ac9255479a1f447e81992b71c4f4934";
 const RELAY_ENDPOINT = "";
 const STORE_KEY = "aidtrace_state_v4";
 
 const NETWORK = {
-  name: "Celo Sepolia",
-  chainId: "0xaa044c",
-  numericChainId: 11142220,
-  explorer: "https://celo-sepolia.blockscout.com",
+  name: "Celo Mainnet",
+  chainId: "0xa4ec",
+  numericChainId: 42220,
+  explorer: "https://celo.blockscout.com",
 };
 
 const translations = {

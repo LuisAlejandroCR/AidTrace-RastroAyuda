@@ -28,9 +28,24 @@ USDC token for donor funding: 0xcebA9300f2b948710d2653dD7B07f33A8B32118C
 USDC feeCurrency adapter for relayer txs: 0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B
 ```
 
+AidTraceLedger:
+
+```text
+Contract: 0xaf5c40e82ac9255479a1f447e81992b71c4f4934
+Deploy tx: 0xffff51135fb18030c1cc3f9fbfddfdbb1b0540c77c6824b9a9c1f7d163e908c2
+```
+
 ## Block 1: Deploy Contract
 
-Install Foundry, then deploy with the provided script:
+Done on Celo Mainnet.
+
+```text
+Contract: 0xaf5c40e82ac9255479a1f447e81992b71c4f4934
+Deploy tx: 0xffff51135fb18030c1cc3f9fbfddfdbb1b0540c77c6824b9a9c1f7d163e908c2
+Admin: 0x326F24884FAFA1810034F4F6Dd41d280fB500569
+```
+
+Redeploy only if the contract must change. For a fresh deployment, use:
 
 ```powershell
 $env:RastroAyuda_Admin_PRIVATE_KEY = "0x..."
@@ -61,10 +76,10 @@ cast send <CONTRACT_ADDRESS> `
 
 ## Block 2: Configure Browser App
 
-Edit `app.js`:
+Done for the deployed contract:
 
 ```js
-const CONTRACT_ADDRESS = "0x..."; // Deployed AidTraceLedger.
+const CONTRACT_ADDRESS = "0xaf5c40e82ac9255479a1f447e81992b71c4f4934";
 const RELAY_ENDPOINT = "";        // Fill after Zavu Function or backend is deployed.
 ```
 
