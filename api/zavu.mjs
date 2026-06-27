@@ -22,36 +22,36 @@ function buildReply(text) {
   return `Registrado: ${action} para ${batchId}. Detalles: ${details}`;
 }
 
-export default {
-  async fetch(request) {
-    if (request.method !== "POST") {
-      return new Response("Method not allowed", { status: 405 });
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).send("Method not allowed");
+  }
+
+  try {
+    const event = req.body;
+
+    console.log("Zavu event:", JSON.stringify(event, null, 2));
+
+    if (event.type !== "message.inbound") {
+      return res.status(200).send("Ignored");
     }
 
-    try {
-      const event = await request.json();
+    const { from, channel, text } = event.data || {};
 
-      if (event.type !== "message.inbound") {
-        return new Response("Ignored", { status: 200 });
-      }
-
-      const { from, channel, text } = event.data || {};
-
-      if (!from || !channel) {
-        return new Response("Missing sender data", { status: 400 });
-      }
-
-      await zavu.messages.send({
-        to: from,
-        channel,
-        text: buildReply(text),
-        idempotencyKey: `reply-${event.id}`,
-      });
-
-      return new Response("OK", { status: 200 });
-    } catch (error) {
-      console.error("Zavu webhook error:", error);
-      return new Response("Webhook error", { status: 500 });
+    if (!from || !channel) {
+      return res.status(400).send("Missing from/channel");
     }
-  },
-};
+
+    await zavu.messages.send({
+      to: from,
+      channel,
+      text: buildReply(text),
+      idempotencyKey: `aidtrace-reply-${event.id}`,
+    });
+
+    return res.status(200).send("OK");
+  } catch (error) {
+    console.error("Webhook error:", error);
+    return res.status(500).send("Webhook error");
+  }
+}
