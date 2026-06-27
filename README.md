@@ -85,7 +85,46 @@ const RELAY_ENDPOINT = "";        // Fill after Zavu Function or backend is depl
 
 If `RELAY_ENDPOINT` is empty, events remain local and the app can demo QR creation, labels, timeline, offline warnings, and queued states. Auto-sync starts only after a relay endpoint exists.
 
-## Block 3: Setup Zavu
+## Block 3: Verify Contract
+
+Use Celo Blockscout contract verification for:
+
+```text
+Contract address: 0xaf5c40e82ac9255479a1f447e81992b71c4f4934
+Compiler type: Solidity (Single file)
+Compiler version: v0.8.24+commit.e11b9ed9
+Open source license: MIT
+Contract name: AidTraceLedger
+Optimization: No
+EVM version: cancun
+Constructor argument:
+000000000000000000000000326f24884fafa1810034f4f6dd41d280fb500569
+```
+
+Paste the full contents of `AidTraceLedger.sol` as the source code. Leave libraries empty.
+
+If using Foundry verification instead of the UI:
+
+```powershell
+$constructorArgs = cast abi-encode "constructor(address)" 0x326F24884FAFA1810034F4F6Dd41d280fB500569
+forge verify-contract `
+  --chain-id 42220 `
+  --verifier blockscout `
+  --verifier-url https://celo.blockscout.com/api/ `
+  --constructor-args $constructorArgs `
+  0xaf5c40e82ac9255479a1f447e81992b71c4f4934 `
+  AidTraceLedger.sol:AidTraceLedger
+```
+
+On Windows, if Foundry fails with `cannot resolve file`, use the Blockscout UI values above. The contract and constructor settings are already exact.
+
+After verification, open:
+
+```text
+https://celo.blockscout.com/address/0xaf5c40e82ac9255479a1f447e81992b71c4f4934
+```
+
+## Block 4: Setup Zavu
 
 Create a Zavu sender in [dashboard.zavu.dev](https://dashboard.zavu.dev/) with SMS, WhatsApp, or both. Keep phone numbers in E.164 format.
 
@@ -117,7 +156,7 @@ zavu deploy
 
 When Zavu gives you an HTTP endpoint or function URL for browser sync, set it as `RELAY_ENDPOINT` in `app.js`.
 
-## Block 4: Zavu Message Contract
+## Block 5: Zavu Message Contract
 
 Inbound SMS/WhatsApp should be text-only and compact:
 
@@ -137,7 +176,7 @@ Relayer behavior:
 
 Use Zavu `idempotencyKey` from inbound `messageId + batchId + actionType` to avoid duplicate confirmations. Use the inbound phone number as the off-chain sender identity; do not put personal phone numbers directly on-chain.
 
-## Block 5: Test Path
+## Block 6: Test Path
 
 Run this order:
 
