@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#eef6f1" />
+    <title>AidTrace | RastroAyuda</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow" data-i18n="eyebrow">Offline aid tracking on Celo</p>
+        <h1>AidTrace</h1>
+        <p class="subhead" data-i18n="subhead">RastroAyuda: calm, verifiable custody for humanitarian supplies.</p>
+      </div>
+      <button id="languageToggle" class="language-button" type="button" aria-label="Change language">
+        <strong>ES</strong>
+        <span id="languageHint" data-i18n="languageHint">Clic para cambiar de lenguaje</span>
+      </button>
+    </header>
+
+    <nav class="tabbar" aria-label="App screens">
+      <button class="tab is-active" type="button" data-screen-target="create" data-i18n="navCreate">Create</button>
+      <button class="tab" type="button" data-screen-target="update" data-i18n="navUpdate">Update</button>
+      <button class="tab" type="button" data-screen-target="timeline" data-i18n="navTimeline">Timeline</button>
+      <button class="tab" type="button" data-screen-target="system" data-i18n="navSystem">System</button>
+    </nav>
+
+    <main class="screen-shell">
+      <section id="screen-create" class="screen is-active" aria-labelledby="create-title">
+        <div class="screen-head">
+          <p class="eyebrow" data-i18n="createEyebrow">Start a trace</p>
+          <h2 id="create-title" data-i18n="createTitle">New aid batch</h2>
+          <p data-i18n="createIntro">Create a QR code and local proof first. The blockchain sync can happen later.</p>
+        </div>
+        <form id="batchForm" class="panel form-grid">
+          <label>
+            <span data-i18n="supplyType">Supply type</span>
+            <select id="supplyType" required>
+              <option value="water" data-i18n="water">Water</option>
+              <option value="food" data-i18n="food">Food</option>
+              <option value="medicine" data-i18n="medicine">Medicine</option>
+              <option value="shelter" data-i18n="shelter">Shelter kit</option>
+              <option value="tools" data-i18n="tools">Rescue tools</option>
+              <option value="other" data-i18n="other">Other</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="quantity">Quantity</span>
+            <input id="quantity" type="text" data-i18n-placeholder="quantityPlaceholder" placeholder="20 boxes, 100 kits..." required />
+          </label>
+          <label>
+            <span data-i18n="origin">Origin</span>
+            <input id="origin" type="text" data-i18n-placeholder="originPlaceholder" placeholder="Collection center / donor" required />
+          </label>
+          <label>
+            <span data-i18n="destination">Destination</span>
+            <input id="destination" type="text" data-i18n-placeholder="destinationPlaceholder" placeholder="Shelter / field team" required />
+          </label>
+          <label class="wide">
+            <span data-i18n="notes">Notes</span>
+            <textarea id="notes" rows="3" data-i18n-placeholder="notesPlaceholder" placeholder="Keep useful, no sensitive personal data."></textarea>
+          </label>
+          <button class="primary wide" type="submit" data-i18n="createButton">Create QR and local proof</button>
+        </form>
+      </section>
+
+      <section id="screen-update" class="screen" aria-labelledby="update-title">
+        <div class="screen-head">
+          <p class="eyebrow" data-i18n="updateEyebrow">Field action</p>
+          <h2 id="update-title" data-i18n="updateTitle">Record custody event</h2>
+          <p data-i18n="updateIntro">Use the QR code, a typed code, WhatsApp, or SMS to record what happened.</p>
+        </div>
+        <form id="eventForm" class="panel form-grid">
+          <label>
+            <span data-i18n="batchCode">Batch code</span>
+            <input id="eventBatchId" type="text" placeholder="AT-..." required />
+          </label>
+          <label>
+            <span data-i18n="action">Action</span>
+            <select id="actionType" required>
+              <option value="PICKED_UP" data-i18n="pickedUp">Picked up</option>
+              <option value="ARRIVED" data-i18n="arrived">Arrived</option>
+              <option value="DELIVERED" data-i18n="delivered">Delivered</option>
+              <option value="DAMAGED" data-i18n="damaged">Damaged</option>
+              <option value="NEEDS_REVIEW" data-i18n="needsReview">Needs review</option>
+              <option value="SMS_CONFIRMED" data-i18n="smsConfirmed">SMS confirmed</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="sender">Sender / operator</span>
+            <input id="senderName" type="text" data-i18n-placeholder="senderPlaceholder" placeholder="Name, team, or phone alias" required />
+          </label>
+          <label>
+            <span data-i18n="location">Location</span>
+            <input id="locationText" type="text" data-i18n-placeholder="locationPlaceholder" placeholder="Area or site name" required />
+          </label>
+          <label class="wide">
+            <span data-i18n="evidence">Evidence note</span>
+            <textarea id="eventNote" rows="3" data-i18n-placeholder="evidencePlaceholder" placeholder="Example: Delivered to shelter coordinator Maria."></textarea>
+          </label>
+          <button class="primary wide" type="submit" data-i18n="queueButton">Save local proof</button>
+        </form>
+      </section>
+
+      <section id="screen-timeline" class="screen" aria-labelledby="timeline-title">
+        <div class="screen-head split">
+          <div>
+            <p class="eyebrow" data-i18n="timelineEyebrow">Supervisor</p>
+            <h2 id="timeline-title" data-i18n="timelineTitle">Proof timeline</h2>
+            <p id="queueState">0 pending</p>
+          </div>
+        </div>
+        <div id="timeline" class="timeline" aria-live="polite"></div>
+      </section>
+
+      <section id="screen-system" class="screen" aria-labelledby="system-title">
+        <div class="screen-head">
+          <p class="eyebrow" data-i18n="systemEyebrow">Operations</p>
+          <h2 id="system-title" data-i18n="systemTitle">Automatic sync</h2>
+          <p data-i18n="systemIntro">Field users do not sync manually. AidTrace stores proofs locally and sends them to a Zavu/webhook relayer once internet returns.</p>
+        </div>
+        <div class="panel settings-grid">
+          <label>
+            <span data-i18n="network">Network</span>
+            <select id="networkMode">
+              <option value="sepolia">Celo Sepolia - demo / free testnet</option>
+              <option value="mainnet">Celo Mainnet - sponsor relayer</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="contractAddress">Contract address</span>
+            <input id="contractAddress" type="text" placeholder="0x..." />
+          </label>
+          <label class="wide">
+            <span data-i18n="relayEndpoint">Relayer webhook</span>
+            <input id="relayEndpoint" type="url" data-i18n-placeholder="relayPlaceholder" placeholder="https://..." />
+          </label>
+          <button id="saveSettings" class="secondary full" type="button" data-i18n="saveSettings">Save settings</button>
+          <button id="openZavu" class="ghost full" type="button" data-i18n="zavu">Open Zavu messages</button>
+        </div>
+        <dl class="facts">
+          <div><dt data-i18n="fundingWallet">Funding wallet</dt><dd id="adminAddress"></dd></div>
+          <div><dt data-i18n="feeCoin">Network fee coin</dt><dd>USDC on Celo</dd></div>
+          <div><dt data-i18n="status">Status</dt><dd id="networkState">Offline ready</dd></div>
+          <div><dt data-i18n="contract">Contract</dt><dd id="contractDisplay">Set after deploy</dd></div>
+        </dl>
+        <p class="hint" data-i18n="senderHint">Sender still matters: AidTrace stores the field sender and, when synced, the wallet or relayer that submitted the proof.</p>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <template id="itemTemplate">
+      <article class="timeline-item">
+        <div class="tag"></div>
+        <div>
+          <h3></h3>
+          <p></p>
+          <small></small>
+        </div>
+      </article>
+    </template>
+
+    <script src="./qrcode.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

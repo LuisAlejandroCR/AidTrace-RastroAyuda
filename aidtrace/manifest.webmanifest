@@ -1,0 +1,9 @@
+{
+  "name": "AidTrace | RastroAyuda",
+  "short_name": "AidTrace",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#eef6f1",
+  "theme_color": "#eef6f1",
+  "icons": []
+}
