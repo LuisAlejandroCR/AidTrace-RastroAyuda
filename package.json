@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@zavudev/sdk": "^0.46.0",
+    "express": "^5.2.1"
+  }
+}
