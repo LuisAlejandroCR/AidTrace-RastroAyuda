@@ -68,13 +68,15 @@ zavu:<message_id> | DELIVER AT-CELO-1 | 100 aguas refugio mayor
 
 Use short natural commands. The first number belongs to the batch code; numbers after the action are treated as details.
 
+Note: CELO1 is a keyword to help Telegram bot identify the batch id
+
 Examples:
 
 ```text
 CELO1 depositar 100 aguas refugio mayor
-LOTE 1 entregar 15 kits refugio mayor
-AT-CELO-1 recoger centro de acopio norte
-AT-CELO-1 revisar faltan 3 cajas
+CELO1 entregar 15 kits refugio mayor
+CELO1 recoger centro de acopio norte
+CELO1 revisar faltan 3 cajas
 ```
 
 Main words:
@@ -102,7 +104,6 @@ Network: Celo Mainnet
 Chain ID: 42220
 RPC: https://forno.celo.org
 Contract: 0xaf5c40e82ac9255479a1f447e81992b71c4f4934
-Deploy tx: 0xffff51135fb18030c1cc3f9fbfddfdbb1b0540c77c6824b9a9c1f7d163e908c2
 Admin and funding wallet: 0x326F24884FAFA1810034F4F6Dd41d280fB500569
 ```
 
@@ -147,156 +148,12 @@ contracts/AidTraceLedger.sol On-chain proof ledger
 scripts/send-zavu-message.mjs Outbound channel smoke test
 ```
 
-Local checks:
-
-```powershell
-node --check .\app.js
-node --check .\api\zavu.mjs
-node --check .\api\timeline.mjs
 ```
 
 Local static preview:
 
 ```powershell
 npx serve .
-```
-
-Vercel deployment:
-
-```powershell
-vercel env add RASTROAYUDA_ZAVU_API_KEY production
-vercel env add RASTROAYUDA_RELAYER_PRIVATE_KEY production
-vercel env add AIDTRACE_CONTRACT production
-vercel env add AIDTRACE_DEPLOYMENT_TX_HASH production
-vercel env add CELO_RPC_URL production
-vercel env add SUPABASE_URL production
-vercel env add SUPABASE_SERVICE_ROLE_KEY production
-vercel --prod
-```
-
-Important env vars for Vercel:
-
-```text
-RASTROAYUDA_ZAVU_API_KEY=<full zv_live_... key>
-RASTROAYUDA_RELAYER_PRIVATE_KEY=<0x... relayer private key>
-AIDTRACE_CONTRACT=0xaf5c40e82ac9255479a1f447e81992b71c4f4934
-AIDTRACE_DEPLOYMENT_TX_HASH=0xffff51135fb18030c1cc3f9fbfddfdbb1b0540c77c6824b9a9c1f7d163e908c2
-CELO_RPC_URL=https://forno.celo.org
-SUPABASE_URL=<supabase project url>
-SUPABASE_SERVICE_ROLE_KEY=<server-only service role key>
-```
-
-Zavu webhook:
-
-```text
-Method: POST
-URL: https://<deployment>/api/zavu
-Event: message.inbound
-Live channel: telegram
-```
-
-Browser relay payload:
-
-```text
-schema: aidtrace.relay.v1
-pending: local custody events waiting for Celo
-```
-
-Timeline API:
-
-```text
-GET /api/timeline?limit=30
-Default browser load: 30 latest records
-Default visible records: 10
-See all: requests up to 100 records
-```
-
-Optional lock tuning:
-
-```text
-AIDTRACE_CELO_WRITE_GAP_MS=1800
-AIDTRACE_CELO_LOCK_WAIT_MS=25000
-AIDTRACE_CELO_LOCK_TTL_MS=45000
-AIDTRACE_CELO_LOCK_KEY=aidtrace:celo-write-lock
-AIDTRACE_SUPABASE_LOCK_ACQUIRE_RPC=try_acquire_aidtrace_lock
-AIDTRACE_SUPABASE_LOCK_RELEASE_RPC=release_aidtrace_lock
-```
-
-## Supabase Lock SQL
-
-Run this in Supabase SQL Editor:
-
-```sql
-create table if not exists public.aidtrace_locks (
-  lock_key text primary key,
-  lock_value text not null,
-  expires_at timestamptz not null,
-  created_at timestamptz not null default now()
-);
-
-alter table public.aidtrace_locks enable row level security;
-
-create or replace function public.try_acquire_aidtrace_lock(
-  p_lock_key text,
-  p_lock_value text,
-  p_ttl_ms integer
-)
-returns boolean
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  delete from public.aidtrace_locks
-  where lock_key = p_lock_key
-    and expires_at < now();
-
-  insert into public.aidtrace_locks(lock_key, lock_value, expires_at)
-  values (
-    p_lock_key,
-    p_lock_value,
-    now() + ((p_ttl_ms || ' milliseconds')::interval)
-  )
-  on conflict do nothing;
-
-  return exists (
-    select 1
-    from public.aidtrace_locks
-    where lock_key = p_lock_key
-      and lock_value = p_lock_value
-  );
-end;
-$$;
-
-create or replace function public.release_aidtrace_lock(
-  p_lock_key text,
-  p_lock_value text
-)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  delete from public.aidtrace_locks
-  where lock_key = p_lock_key
-    and lock_value = p_lock_value;
-end;
-$$;
-
-grant execute on function public.try_acquire_aidtrace_lock(text, text, integer) to anon, authenticated, service_role;
-grant execute on function public.release_aidtrace_lock(text, text) to anon, authenticated, service_role;
-
-notify pgrst, 'reload schema';
-```
-
-Verify the functions:
-
-```sql
-select routine_schema, routine_name
-from information_schema.routines
-where routine_schema = 'public'
-  and routine_name in ('try_acquire_aidtrace_lock', 'release_aidtrace_lock');
 ```
 
 ## Contract Notes
