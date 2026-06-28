@@ -74,6 +74,8 @@ const translations = {
     syncPartial: "Some proofs were saved on Celo. The pending ones will retry automatically.",
     syncNeedsRelay: "Saved locally. AidTrace will sync automatically when the Celo saver is configured.",
     syncFailed: "AidTrace could not save these proofs on Celo yet. It will retry automatically.",
+    leaveWarning: "We're offline or proofs are still pending. Reloading or closing now may delay sync.",
+    offlineReloadWarning: "We're offline. Reloading or closing can delay sync. Keep this tab open until you are online.",
     timelineLoaded: "Timeline updated from Celo.",
     timelineLoadFailed: "Local proofs are visible. Celo timeline will retry automatically.",
     networkReady: "Celo Mainnet ready",
@@ -152,6 +154,8 @@ const translations = {
     syncPartial: "Algunas pruebas fueron guardadas en Celo. Las pendientes se reintentaran automaticamente.",
     syncNeedsRelay: "Guardado localmente. AidTrace sincronizara automaticamente cuando el guardador de Celo este configurado.",
     syncFailed: "AidTrace aun no pudo guardar estas pruebas en Celo. Se reintentara automaticamente.",
+    leaveWarning: "Estamos offline o aun hay pruebas pendientes. Recargar o cerrar ahora puede retrasar la sincronizacion.",
+    offlineReloadWarning: "Estamos offline. Recargar o cerrar puede retrasar la sincronizacion. Mantén esta pestana abierta hasta estar online.",
     timelineLoaded: "Historial actualizado desde Celo.",
     timelineLoadFailed: "Las pruebas locales estan visibles. El historial de Celo se reintentara automaticamente.",
     networkReady: "Celo Mainnet listo",
@@ -540,6 +544,18 @@ function sendPendingBeforeLeave() {
   }
 }
 
+function shouldWarnBeforeLeave() {
+  return !navigator.onLine || state.events.some((event) => event.status === "pending");
+}
+
+function warnBeforeLeave(event) {
+  if (!shouldWarnBeforeLeave()) return;
+  notify(t("leaveWarning"));
+  event.preventDefault();
+  event.returnValue = t("leaveWarning");
+  return t("leaveWarning");
+}
+
 function refreshAfterOnline() {
   if (sessionStorage.getItem(ONLINE_RELOAD_KEY) === "1") return;
   sessionStorage.setItem(ONLINE_RELOAD_KEY, "1");
@@ -694,11 +710,12 @@ window.addEventListener("online", async () => {
 window.addEventListener("offline", () => {
   sessionStorage.removeItem(ONLINE_RELOAD_KEY);
   render();
-  notify(t("offlineSaved"));
+  notify(t("offlineReloadWarning"));
 });
 window.addEventListener("focus", () => loadOnchainTimeline({ silent: true }));
 window.addEventListener("pageshow", () => loadOnchainTimeline({ silent: true }));
 window.addEventListener("pagehide", sendPendingBeforeLeave);
+window.addEventListener("beforeunload", warnBeforeLeave);
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js");
