@@ -17,6 +17,8 @@ const CONTRACT_ADDRESS =
 const CELO_RPC_URL = process.env.CELO_RPC_URL || "https://forno.celo.org";
 const CELOSCAN_TX_BASE = process.env.CELOSCAN_TX_BASE || "https://celoscan.io/tx";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const CELO_WRITE_GAP_MS = Number(process.env.AIDTRACE_CELO_WRITE_GAP_MS || "1800");
+let celoWriteQueue = Promise.resolve();
 
 const abi = [
   {
@@ -42,6 +44,21 @@ function setCors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function enqueueCeloWrite(work) {
+  const queued = celoWriteQueue.then(async () => {
+    const result = await work();
+    await sleep(CELO_WRITE_GAP_MS);
+    return result;
+  });
+
+  celoWriteQueue = queued.catch(() => {});
+  return queued;
 }
 
 const ACTION_ALIASES = {
@@ -265,20 +282,22 @@ async function handleBrowserRelay(packet, res) {
   for (const item of pending) {
     try {
       const parsed = relayEventToParsed(item);
-      const result = await recordOnCelo(
-        { id: item.id || randomUUID() },
-        {
-          channel: "browser",
-          from: item.senderName || "AidTrace browser",
-          messageId: item.id,
-        },
-        parsed,
-        {
-          source: "browser",
-          messageId: item.id,
-          referenceURI: item.ref || `aidtrace:${parsed.batchId}`,
-          extraData: item,
-        },
+      const result = await enqueueCeloWrite(() =>
+        recordOnCelo(
+          { id: item.id || randomUUID() },
+          {
+            channel: "browser",
+            from: item.senderName || "AidTrace browser",
+            messageId: item.id,
+          },
+          parsed,
+          {
+            source: "browser",
+            messageId: item.id,
+            referenceURI: item.ref || `aidtrace:${parsed.batchId}`,
+            extraData: item,
+          },
+        ),
       );
 
       recorded.push({
@@ -352,7 +371,7 @@ export default async function handler(req, res) {
 
     try {
       parsed = parseAidTraceText(data.text);
-      const { messageId, txHash } = await recordOnCelo(event, data, parsed);
+      const { messageId, txHash } = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed));
       replyText = buildSuccessReply(parsed, txHash);
       idempotencyKey = `aidtrace-reply-${messageId}`;
     } catch (error) {

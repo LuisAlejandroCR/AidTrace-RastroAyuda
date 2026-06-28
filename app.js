@@ -2,8 +2,9 @@ const FUNDING_WALLET = "0x326F24884FAFA1810034F4F6Dd41d280fB500569";
 const USDC_TOKEN_ADDRESS = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C";
 const USDC_FEE_CURRENCY = "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B";
 const CONTRACT_ADDRESS = "0xaf5c40e82ac9255479a1f447e81992b71c4f4934";
-const RELAY_ENDPOINT = "https://aidtrace-rastroayuda.vercel.app/api/zavu";
-const TIMELINE_ENDPOINT = "https://aidtrace-rastroayuda.vercel.app/api/timeline";
+const APP_ORIGIN = window.location.origin;
+const RELAY_ENDPOINT = `${APP_ORIGIN}/api/zavu`;
+const TIMELINE_ENDPOINT = `${APP_ORIGIN}/api/timeline`;
 const STORE_KEY = "aidtrace_state_v4";
 
 const NETWORK = {
@@ -71,6 +72,7 @@ const translations = {
     syncFailed: "AidTrace could not save these proofs on Celo yet. It will retry automatically.",
     timelineLoaded: "Timeline updated from Celo.",
     timelineLoadFailed: "Local proofs are visible. Celo timeline will retry automatically.",
+    openTimelineApi: "Open Celo data",
     networkReady: "Celo Mainnet ready",
     offlineReady: "Offline ready",
     saveQrPdf: "Click here to save the QR as PDF",
@@ -144,6 +146,7 @@ const translations = {
     syncFailed: "AidTrace aun no pudo guardar estas pruebas en Celo. Se reintentara automaticamente.",
     timelineLoaded: "Historial actualizado desde Celo.",
     timelineLoadFailed: "Las pruebas locales estan visibles. El historial de Celo se reintentara automaticamente.",
+    openTimelineApi: "Abrir datos de Celo",
     networkReady: "Celo Mainnet listo",
     offlineReady: "Listo sin internet",
     saveQrPdf: "Haz clic aqui para guardar el QR como PDF",
@@ -527,6 +530,7 @@ function applyLanguage() {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   });
   $("languageToggle").querySelector("strong").textContent = state.language === "en" ? "ES" : "EN";
+  $("timelineApiLink").href = `${TIMELINE_ENDPOINT}?limit=75`;
 }
 
 function render() {
