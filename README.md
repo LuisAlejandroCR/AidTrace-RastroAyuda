@@ -361,6 +361,63 @@ create table if not exists public.aidtrace_locks (
 alter table public.aidtrace_locks enable row level security;
 ```
 
+Create the lock RPC functions in the same SQL Editor tab:
+
+```sql
+create or replace function public.try_acquire_aidtrace_lock(
+  p_lock_key text,
+  p_lock_value text,
+  p_ttl_ms integer
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.aidtrace_locks
+  where lock_key = p_lock_key
+    and expires_at < now();
+
+  insert into public.aidtrace_locks(lock_key, lock_value, expires_at)
+  values (
+    p_lock_key,
+    p_lock_value,
+    now() + ((p_ttl_ms || ' milliseconds')::interval)
+  )
+  on conflict do nothing;
+
+  return exists (
+    select 1
+    from public.aidtrace_locks
+    where lock_key = p_lock_key
+      and lock_value = p_lock_value
+  );
+end;
+$$;
+
+create or replace function public.release_aidtrace_lock(
+  p_lock_key text,
+  p_lock_value text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.aidtrace_locks
+  where lock_key = p_lock_key
+    and lock_value = p_lock_value;
+end;
+$$;
+
+grant execute on function public.try_acquire_aidtrace_lock(text, text, integer) to anon, authenticated, service_role;
+grant execute on function public.release_aidtrace_lock(text, text) to anon, authenticated, service_role;
+```
+
+If Vercel logs show `new row violates row-level security policy`, the direct-table lock path is being blocked. Use the RPC functions above and redeploy with the latest `api/zavu.mjs`.
+
 Use the server-only service role key from Supabase. Do not expose it in browser code.
 
 Vercel env vars:
@@ -377,7 +434,8 @@ AIDTRACE_CELO_WRITE_GAP_MS=1800
 AIDTRACE_CELO_LOCK_WAIT_MS=25000
 AIDTRACE_CELO_LOCK_TTL_MS=45000
 AIDTRACE_CELO_LOCK_KEY=aidtrace:celo-write-lock
-AIDTRACE_SUPABASE_LOCK_TABLE=aidtrace_locks
+AIDTRACE_SUPABASE_LOCK_ACQUIRE_RPC=try_acquire_aidtrace_lock
+AIDTRACE_SUPABASE_LOCK_RELEASE_RPC=release_aidtrace_lock
 ```
 
 Keep the lock TTL longer than one expected Celo write plus confirmation wait. If the function crashes, the lock expires automatically.

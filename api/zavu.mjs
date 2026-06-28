@@ -24,7 +24,8 @@ const CELO_LOCK_POLL_MS = Number(process.env.AIDTRACE_CELO_LOCK_POLL_MS || "500"
 const CELO_LOCK_KEY = process.env.AIDTRACE_CELO_LOCK_KEY || "aidtrace:celo-write-lock";
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const SUPABASE_LOCK_TABLE = process.env.AIDTRACE_SUPABASE_LOCK_TABLE || "aidtrace_locks";
+const SUPABASE_LOCK_ACQUIRE_RPC = process.env.AIDTRACE_SUPABASE_LOCK_ACQUIRE_RPC || "try_acquire_aidtrace_lock";
+const SUPABASE_LOCK_RELEASE_RPC = process.env.AIDTRACE_SUPABASE_LOCK_RELEASE_RPC || "release_aidtrace_lock";
 const REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "";
 const REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "";
 let celoWriteQueue = Promise.resolve();
@@ -76,13 +77,11 @@ function supabaseHeaders(prefer = "") {
   };
 }
 
-async function supabaseRequest(path, options = {}) {
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      ...supabaseHeaders(options.prefer),
-      ...(options.headers || {}),
-    },
+async function supabaseRpc(name, payload) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+    method: "POST",
+    headers: supabaseHeaders(),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -94,38 +93,14 @@ async function supabaseRequest(path, options = {}) {
   return response.json();
 }
 
-async function clearExpiredSupabaseLock(nowIso) {
-  await supabaseRequest(
-    `${SUPABASE_LOCK_TABLE}?lock_key=eq.${encodeURIComponent(CELO_LOCK_KEY)}&expires_at=lt.${encodeURIComponent(nowIso)}`,
-    {
-      method: "DELETE",
-      prefer: "return=minimal",
-    },
-  );
-}
-
 async function tryAcquireSupabaseLock(lockValue) {
-  const now = new Date();
-  await clearExpiredSupabaseLock(now.toISOString());
-
-  const expiresAt = new Date(now.getTime() + CELO_LOCK_TTL_MS).toISOString();
-  const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_LOCK_TABLE}?on_conflict=lock_key`, {
-    method: "POST",
-    headers: supabaseHeaders("resolution=ignore-duplicates,return=representation"),
-    body: JSON.stringify({
-      lock_key: CELO_LOCK_KEY,
-      lock_value: lockValue,
-      expires_at: expiresAt,
-    }),
+  const acquired = await supabaseRpc(SUPABASE_LOCK_ACQUIRE_RPC, {
+    p_lock_key: CELO_LOCK_KEY,
+    p_lock_value: lockValue,
+    p_ttl_ms: CELO_LOCK_TTL_MS,
   });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Supabase lock error: ${response.status} ${text}`);
-  }
-
-  const rows = await response.json();
-  return Array.isArray(rows) && rows.length === 1;
+  return acquired === true;
 }
 
 async function acquireSupabaseLock() {
@@ -142,13 +117,10 @@ async function acquireSupabaseLock() {
 
 async function releaseSupabaseLock(lockValue) {
   if (!lockValue) return;
-  await supabaseRequest(
-    `${SUPABASE_LOCK_TABLE}?lock_key=eq.${encodeURIComponent(CELO_LOCK_KEY)}&lock_value=eq.${encodeURIComponent(lockValue)}`,
-    {
-      method: "DELETE",
-      prefer: "return=minimal",
-    },
-  );
+  await supabaseRpc(SUPABASE_LOCK_RELEASE_RPC, {
+    p_lock_key: CELO_LOCK_KEY,
+    p_lock_value: lockValue,
+  });
 }
 
 function hasRedisLock() {
