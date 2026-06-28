@@ -375,8 +375,12 @@ async function loadOnchainTimeline({ silent = true, limit = TIMELINE_FETCH_LIMIT
 }
 
 function printQrPdf(batchId, link) {
-  const win = window.open("", "_blank", "noopener,noreferrer");
-  if (!win) return;
+  const win = window.open("", "_blank");
+  if (!win) {
+    notify("Your browser blocked the QR label window. Allow pop-ups for AidTrace and try again.");
+    return;
+  }
+  win.opener = null;
   const safeTitle = escapeHtml(`${batchId} QR`);
   const safeBatchId = escapeHtml(batchId);
   const safeLink = escapeHtml(link);
