@@ -10,6 +10,7 @@ const NETWORK = {
   chainId: "0xa4ec",
   numericChainId: 42220,
   explorer: "https://celo.blockscout.com",
+  txExplorer: "https://celoscan.io/tx",
 };
 
 const translations = {
@@ -66,6 +67,10 @@ const translations = {
     syncDone: "Sync complete. Pending proofs were sent to the relayer.",
     syncNeedsRelay: "Saved locally. AidTrace will sync automatically when the relayer is configured.",
     syncFailed: "The relayer did not accept the proofs yet. AidTrace will retry automatically.",
+    downloadQr: "Click here to download the QR",
+    txLink: "View Celo transaction",
+    localProof: "Local proof",
+    relayerPacketSent: "Relayer packet sent",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -120,6 +125,10 @@ const translations = {
     syncDone: "Sincronizacion completa. Las pruebas pendientes fueron enviadas al relayer.",
     syncNeedsRelay: "Guardado localmente. AidTrace sincronizara automaticamente cuando el relayer este configurado.",
     syncFailed: "El relayer aun no acepto las pruebas. AidTrace reintentara automaticamente.",
+    downloadQr: "Haz clic aqui para descargar el QR",
+    txLink: "Ver transaccion en Celo",
+    localProof: "Prueba local",
+    relayerPacketSent: "Paquete enviado al relayer",
   },
 };
 
@@ -179,6 +188,10 @@ function qrSvg(text) {
   qr.addData(text);
   qr.make();
   return qr.createSvgTag(3, 1);
+}
+
+function qrDownloadHref(text) {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrSvg(text))}`;
 }
 
 function batchLink(batchId) {
@@ -270,7 +283,7 @@ async function postRelayPacket(useBeacon = false) {
     body,
   });
   if (!response.ok) throw new Error(`Relay failed: ${response.status}`);
-  return true;
+  return response.json();
 }
 
 async function autoSyncPending() {
@@ -278,11 +291,13 @@ async function autoSyncPending() {
   if (!navigator.onLine || !pending.length || !RELAY_ENDPOINT) return;
   notify(t("onlineSyncing"));
   try {
-    await postRelayPacket();
+    const relayResult = await postRelayPacket();
+    const txById = new Map((relayResult?.recorded || []).map((item) => [item.id, item.txHash]));
     const syncedAt = new Date().toISOString();
     for (const event of pending) {
       event.status = "sent_to_relayer";
       event.syncedAt = syncedAt;
+      event.txHash = txById.get(event.id) || event.txHash || "";
     }
     saveState();
     notify(t("syncDone"));
@@ -357,12 +372,22 @@ function render() {
   for (const event of state.events) {
     const node = template.content.cloneNode(true);
     const tag = node.querySelector(".tag");
-    tag.innerHTML = `${qrSvg(batchLink(event.batchId))}<span>${event.batchId}</span>`;
+    const link = batchLink(event.batchId);
+    tag.innerHTML = `
+      ${qrSvg(link)}
+      <span>${event.batchId}</span>
+      <a class="qr-download" href="${qrDownloadHref(link)}" download="${event.batchId}-qr.svg">${t("downloadQr")}</a>
+    `;
     node.querySelector("h3").textContent = `${event.actionType.replaceAll("_", " ")} - ${event.status}`;
     node.querySelector("p").textContent = `${event.senderName} - ${event.locationText}. ${event.note || ""}`.trim();
-    node.querySelector("small").textContent = event.syncedAt
-      ? `Relayer packet sent - ${new Date(event.syncedAt).toLocaleString()}`
-      : `Local proof ${short(event.dataHash)} - ${new Date(event.createdAt).toLocaleString()}`;
+    const proof = node.querySelector("small");
+    if (event.txHash) {
+      proof.innerHTML = `${t("relayerPacketSent")} - <a href="${NETWORK.txExplorer}/${event.txHash}" target="_blank" rel="noreferrer">${t("txLink")}</a>`;
+    } else {
+      proof.textContent = event.syncedAt
+        ? `${t("relayerPacketSent")} - ${new Date(event.syncedAt).toLocaleString()}`
+        : `${t("localProof")} ${short(event.dataHash)} - ${new Date(event.createdAt).toLocaleString()}`;
+    }
     timeline.appendChild(node);
   }
 }

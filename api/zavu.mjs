@@ -38,6 +38,12 @@ const zavu = new Zavudev({
   apiKey: process.env.RASTROAYUDA_ZAVU_API_KEY,
 });
 
+function setCors(res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 const ACTION_ALIASES = {
   PICKUP: "PICKUP",
   PICKED_UP: "PICKUP",
@@ -294,6 +300,12 @@ function buildSuccessReply(parsed, txHash) {
 }
 
 export default async function handler(req, res) {
+  setCors(res);
+
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).send("Method not allowed");
   }

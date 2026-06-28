@@ -267,6 +267,18 @@ button {
   overflow-wrap: anywhere;
 }
 
+.qr-download,
+.timeline-item small a {
+  color: var(--sage-dark);
+  font-weight: 900;
+}
+
+.qr-download {
+  margin-top: 8px;
+  font-size: 0.68rem;
+  line-height: 1.2;
+}
+
 .timeline-item h3 {
   font-size: 1rem;
 }
