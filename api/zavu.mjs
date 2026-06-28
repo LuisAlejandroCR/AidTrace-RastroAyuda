@@ -44,12 +44,18 @@ const ACTION_ALIASES = {
   RECOGIDO: "PICKUP",
   RETIRO: "PICKUP",
   RECIBIR: "PICKUP",
+  RECIBIDO: "PICKUP",
   DELIVER: "DELIVER",
   DELIVERED: "DELIVER",
   DELIVERY: "DELIVER",
   ENTREGAR: "DELIVER",
   ENTREGADO: "DELIVER",
   ENTREGA: "DELIVER",
+  DEPOSITAR: "DELIVER",
+  DEPOSITADO: "DELIVER",
+  DEPOSITO: "DELIVER",
+  LLEVAR: "DELIVER",
+  LLEVADO: "DELIVER",
   REVIEW: "REVIEW",
   REVISAR: "REVIEW",
   REVISION: "REVIEW",
@@ -59,6 +65,8 @@ const ACTION_ALIASES = {
 
 const COMMAND_PREFIXES = new Set(["AT", "AIDTRACE", "RASTROAYUDA", "RASTRO"]);
 const HELP_WORDS = new Set(["HELP", "AYUDA", "START", "INICIO"]);
+const BATCH_ALIAS_PREFIX = process.env.AIDTRACE_ALIAS_PREFIX || "AT-CELO";
+const ALIAS_WORDS = new Set(["CELO", "LOTE", "BATCH"]);
 
 function bytes32Text(value) {
   return stringToHex(String(value).toUpperCase().slice(0, 31), { size: 32 });
@@ -73,11 +81,28 @@ function normalizeCommandPart(value) {
 
 function usageMessage() {
   return [
-    "Formato no reconocido.",
-    "Usa: AT DELIVER AT-DEMO-001 detalles",
-    "O: AT ENTREGAR AT-DEMO-001 detalles",
-    "Acciones: PICKUP/RECOGER, DELIVER/ENTREGAR, REVIEW/REVISAR",
+    "Formato no reconocido o falta la clave del lote.",
+    "Ejemplo: CELO1 depositar 100 aguas refugio mayor",
+    "CELO1 es la clave del lote; 100 aguas queda como detalle.",
+    "Tambien: LOTE 1 entregar 15 kits refugio mayor",
+    "Acciones: recoger, entregar/depositar, revisar",
   ].join("\n");
+}
+
+function aliasToBatchId(value, nextValue = "") {
+  const normalized = normalizeCommandPart(value).replace(/^#/, "");
+  const compact = normalized.match(/^(CELO|LOTE|BATCH)-?#?(\d{1,6})$/);
+
+  if (compact) {
+    return { batchId: `${BATCH_ALIAS_PREFIX}-${Number(compact[2])}`, width: 1 };
+  }
+
+  const nextNumber = normalizeCommandPart(nextValue).replace(/^#/, "");
+  if (ALIAS_WORDS.has(normalized) && /^\d{1,6}$/.test(nextNumber)) {
+    return { batchId: `${BATCH_ALIAS_PREFIX}-${Number(nextNumber)}`, width: 2 };
+  }
+
+  return null;
 }
 
 function parseAidTraceText(text) {
@@ -96,17 +121,31 @@ function parseAidTraceText(text) {
     parts.shift();
   }
 
-  const actionType = ACTION_ALIASES[normalizeCommandPart(parts[0])];
-  const batchId = parts[1];
+  const actionIndex = parts.findIndex((part) => ACTION_ALIASES[normalizeCommandPart(part)]);
+  const batchIndex = parts.findIndex((part) => /^AT-[A-Z0-9-_]+$/i.test(part));
+  const aliasIndex = parts.findIndex((part, index) => aliasToBatchId(part, parts[index + 1]));
+  const aliasMatch = aliasIndex >= 0 ? aliasToBatchId(parts[aliasIndex], parts[aliasIndex + 1]) : null;
+  const aliasIndexes = aliasMatch
+    ? new Set(Array.from({ length: aliasMatch.width }, (_, offset) => aliasIndex + offset))
+    : new Set();
+  const actionType = actionIndex >= 0 ? ACTION_ALIASES[normalizeCommandPart(parts[actionIndex])] : null;
+  const batchId = batchIndex >= 0
+    ? parts[batchIndex]
+    : aliasMatch?.batchId || null;
 
   if (!actionType || !batchId) {
     throw new Error(usageMessage());
   }
 
+  const details = parts
+    .filter((_, index) => index !== actionIndex && index !== batchIndex && !aliasIndexes.has(index))
+    .join(" ");
+
   return {
     actionType,
     batchId: batchId.toUpperCase(),
-    details: parts.slice(2).join(" ") || "sin detalles",
+    details: details || "sin detalles",
+    alias: aliasMatch ? parts.slice(aliasIndex, aliasIndex + aliasMatch.width).join(" ").toUpperCase() : undefined,
   };
 }
 
