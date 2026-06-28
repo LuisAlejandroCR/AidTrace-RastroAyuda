@@ -1,12 +1,12 @@
 # AidTrace | RastroAyuda
 
-Offline-first custody tracking for humanitarian supplies, anchored on Celo and reachable through browser, SMS, or WhatsApp.
+Offline-first custody tracking for humanitarian supplies, anchored on Celo and reachable through browser and Telegram today. SMS and WhatsApp are future channel adapters.
 
 ## Current Architecture
 
 - Static PWA: creates QR labels, records custody events, stores pending events locally, and posts relay packets when online.
 - Service worker: keeps queued relay packets for automatic background sync where the browser supports it.
-- Zavu Function or backend relayer: receives browser sync and inbound SMS/WhatsApp, validates events, and writes proof hashes to Celo.
+- Zavu Function or backend relayer: receives browser sync and inbound Telegram messages, validates events, and writes proof hashes plus public audit memos to Celo.
 - `AidTraceLedger.sol`: stable on-chain audit log. Do not redeploy for new field flows; add new `actionType`, schema, and off-chain parsers.
 
 `CONTRACT_ADDRESS` must be the deployed `AidTraceLedger` address. It is not the admin or funding wallet.
@@ -132,16 +132,15 @@ https://celo.blockscout.com/address/0xaf5c40e82ac9255479a1f447e81992b71c4f4934
 
 ## Block 4: Choose Zavu Channels
 
-Use Zavu with Telegram-first, two-way SMS fallback, and WhatsApp Business when budget/setup allows.
+Use Zavu with Telegram-first for the hackathon. Treat SMS and WhatsApp Business as future development once a local two-way number and WhatsApp sender are available.
 
-Recommended channel policy:
+Current channel policy:
 
 ```text
-Primary low-cost reports: telegram
-Critical offline fallback: sms
-WhatsApp operator flow: whatsapp
-Outbound confirmations: auto
-Broadcast-only alerts: sms_oneway
+Live demo and field reports: telegram
+Browser fallback: offline-first PWA queue
+Future disaster fallback: sms with local two-way number
+Future operator flow: whatsapp_business through Zavu
 ```
 
 Do not use `sms_oneway` for QR custody updates or disaster field reports. One-way SMS is useful for alerts, but AidTrace needs inbound messages from operators, so the sender must support normal two-way SMS.
@@ -150,7 +149,7 @@ Do not migrate to Telegram-only. Telegram is useful because it has no per-messag
 
 For WhatsApp, use WhatsApp Business through Zavu. Do not rely on a personal WhatsApp account. WhatsApp Business gives the project an approved sender, templates for outbound messages, and the 24-hour support window after a user messages AidTrace.
 
-Use `channel: "auto"` for confirmations when possible. Zavu can try WhatsApp and fall back to SMS, which is the right behavior when networks are unstable.
+For the current deployed demo, keep confirmations on the same inbound channel. Add `channel: "auto"` later when SMS/WhatsApp are funded and verified.
 
 ## Block 5: Fund Zavu Channels
 
@@ -168,12 +167,12 @@ The screenshot shows Telegram has no per-message delivery fees, while SMS & Voic
 Hackathon funding order:
 
 1. Use Telegram for coordinator/operator testing and repeated demo messages.
-2. Reserve the `$10.00` Zavu balance for SMS fallback tests and emergency-path demos.
-3. Link WhatsApp Business for richer operator flow if setup is fast enough.
-4. Keep outbound channel as `auto` so Zavu can choose the cheapest working route.
+2. Keep the `$10.00` Zavu balance untouched unless a local two-way SMS test is required.
+3. Flag WhatsApp Business as future development.
+4. Keep confirmations on Telegram for the live demo.
 5. Keep Celo USDC in the funding wallet for the relayer wallet only.
 
-With only `$10.00`, do not make SMS the default for every confirmation. Send SMS only for failed Telegram/WhatsApp delivery, critical handoff events, or demo scenarios proving 2G resilience.
+With only `$10.00` and no international SMS path, do not make SMS part of the live demo.
 
 If Zavu includes a free phone number but the UI will not attach it to two-way SMS, do not buy a new `$5` number yet. Keep the free number for account setup or outbound/sandbox tests, and run the demo with Telegram as the inbound channel. Buy a two-way SMS-capable number only after Telegram and the relayer are working end-to-end.
 
@@ -181,15 +180,15 @@ Do not ask donors to pay Zavu directly with stablecoins. If donors send Celo USD
 
 ## Block 6: Setup Zavu
 
-Create a Zavu sender in [dashboard.zavu.dev](https://dashboard.zavu.dev/) with Telegram first, then SMS only if the number can be attached as two-way, then WhatsApp Business if available. Keep phone numbers in E.164 format for SMS/WhatsApp contacts.
+Create a Zavu sender in [dashboard.zavu.dev](https://dashboard.zavu.dev/) with Telegram for the current demo. Add SMS only when a local two-way number can receive messages from target users; add WhatsApp Business after sender approval.
 
 Decision for the current setup:
 
 ```text
 Telegram: active, use now
 Free number: keep, do not delete
-Paid SMS number: defer unless the live demo requires two-way SMS
-WhatsApp Business: optional after Telegram path works
+SMS: future development, requires local two-way reachability
+WhatsApp Business: future development, requires sender setup/approval
 ```
 
 The repo includes starter source in `zavu/aidtrace-relayer`. Create the Zavu Function workspace, then copy the starter source into it:
@@ -257,7 +256,7 @@ RASTROAYUDA_ZAVU_API_KEY=zv_live_or_test_real_key
 
 The key must start with `zv_live_` or `zv_test_`. `zv_...` and values containing literal `...` are dashboard-shortened placeholders and will fail with `Invalid API key format`; copy the full secret value from Zavu.
 
-Send an SMS test to the free number:
+Optional outbound-only SMS test, future development:
 
 ```powershell
 node .\scripts\send-zavu-message.mjs +14706970482 sms "AidTrace SMS test"
@@ -271,7 +270,7 @@ node .\scripts\send-zavu-message.mjs <telegram_contact_or_chat_id> telegram "Aid
 
 `@AidTrace_Bot` is the bot/sender identity, not the recipient. For Telegram delivery, use the Telegram contact/chat identifier Zavu shows after a user starts the bot or sends the first message.
 
-These scripts only test outbound delivery. They do not replace the relayer. The relayer still needs the `message.inbound` trigger so incoming Telegram/SMS commands can be parsed and written to Celo.
+These scripts only test outbound delivery. They do not replace the relayer. The relayer still needs the `message.inbound` trigger so incoming Telegram commands can be parsed and written to Celo. SMS inbound remains future development until a reachable two-way number is available.
 
 ## Block 8: Delivery Debug
 
@@ -298,11 +297,11 @@ Fastest low-cost test:
 5. Use that contact/chat id for any outbound Telegram confirmation test.
 ```
 
-Pause SMS tests until one prior SMS leaves `queued`. SMS can consume balance on provider attempt even if the phone never shows the message.
+Pause SMS tests for the hackathon. International SMS is not required for the live demo and can consume balance without proving inbound reachability.
 
 ## Block 9: Zavu Message Contract
 
-Inbound SMS/WhatsApp/Telegram should be text-only and natural. Print the short key on the QR label and let operators write quantity in the details:
+Inbound Telegram should be text-only and natural. Future SMS/WhatsApp adapters should use the same grammar. Print the short key on the QR label and let operators write quantity in the details:
 
 ```text
 CELO7 depositar 100 aguas refugio mayor
@@ -319,7 +318,8 @@ Relayer behavior:
 2. Normalize to the same event schema used by the PWA.
 3. Hash the normalized event.
 4. Call `recordAction(batchId, actionType, dataHash, sender, referenceURI)`.
-5. Reply through Zavu with a short confirmation.
+5. Put a short public audit memo in `referenceURI` so explorers show what happened without exposing the full normalized payload.
+6. Reply through Zavu with a short confirmation.
 
 Use Zavu `idempotencyKey` from inbound `messageId + batchId + actionType` to avoid duplicate confirmations. Use the inbound phone number as the off-chain sender identity; do not put personal phone numbers directly on-chain.
 
@@ -332,15 +332,23 @@ Run this order:
 3. Open the QR URL on mobile and add a custody event.
 4. Switch offline, add another event, and confirm it queues without user action.
 5. Restore internet and confirm automatic sync toast.
-6. Send an SMS/WhatsApp command to the Zavu sender.
-7. Confirm the Celo event exists for the batch id.
+6. Send a Telegram command to the Zavu bot: `CELO1 depositar 100 aguas refugio mayor`.
+7. Confirm the Telegram reply includes a Celo transaction hash.
+8. Open the transaction in Celoscan or Blockscout and confirm the `referenceURI` contains the public audit memo.
+9. Confirm the Celo event exists for the batch id.
 
 Useful checks:
 
 ```bash
-zavu fn invoke --event message.inbound --data '{"from":"+584121234567","text":"CELO7 depositar 100 aguas refugio mayor","messageId":"local-test-1","channel":"sms"}'
+zavu fn invoke --event message.inbound --data '{"from":"telegram-demo","text":"CELO1 depositar 100 aguas refugio mayor","messageId":"local-test-1","channel":"telegram"}'
 zavu fn logs --tail
 cast logs --address <CONTRACT_ADDRESS> --rpc-url https://forno.celo.org
+```
+
+Expected public memo shape in the transaction input:
+
+```text
+zavu:<message_id> | DELIVER AT-CELO-1 | 100 aguas refugio mayor
 ```
 
 ## Payment Notes

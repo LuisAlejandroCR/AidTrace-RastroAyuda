@@ -165,6 +165,19 @@ function normalizeAddress(value) {
   return getAddress(String(value).toLowerCase());
 }
 
+function publicAuditText(value) {
+  return String(value || "sin detalles")
+    .replace(/[\r\n|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+}
+
+function buildReferenceURI(source, messageId, parsed, explicitReferenceURI) {
+  const base = explicitReferenceURI || `${source}:${messageId}`;
+  return `${base} | ${parsed.actionType} ${parsed.batchId} | ${publicAuditText(parsed.details)}`;
+}
+
 async function recordOnCelo(event, data, parsed, options = {}) {
   const privateKey = process.env.RASTROAYUDA_RELAYER_PRIVATE_KEY;
   const messageId = options.messageId || getMessageId(event, data);
@@ -212,7 +225,7 @@ async function recordOnCelo(event, data, parsed, options = {}) {
       bytes32Text(parsed.actionType),
       keccak256(stringToBytes(JSON.stringify(normalized))),
       ZERO_ADDRESS,
-      options.referenceURI || `${source}:${messageId}`,
+      buildReferenceURI(source, messageId, parsed, options.referenceURI),
     ],
   });
 
