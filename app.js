@@ -6,6 +6,7 @@ const APP_ORIGIN = window.location.origin;
 const RELAY_ENDPOINT = `${APP_ORIGIN}/api/zavu`;
 const TIMELINE_ENDPOINT = `${APP_ORIGIN}/api/timeline`;
 const STORE_KEY = "aidtrace_state_v4";
+const ONLINE_RELOAD_KEY = "aidtrace_reloaded_after_online";
 
 const NETWORK = {
   name: "Celo Mainnet",
@@ -72,7 +73,6 @@ const translations = {
     syncFailed: "AidTrace could not save these proofs on Celo yet. It will retry automatically.",
     timelineLoaded: "Timeline updated from Celo.",
     timelineLoadFailed: "Local proofs are visible. Celo timeline will retry automatically.",
-    openTimelineApi: "Open Celo data",
     networkReady: "Celo Mainnet ready",
     offlineReady: "Offline ready",
     saveQrPdf: "Click here to save the QR as PDF",
@@ -146,7 +146,6 @@ const translations = {
     syncFailed: "AidTrace aun no pudo guardar estas pruebas en Celo. Se reintentara automaticamente.",
     timelineLoaded: "Historial actualizado desde Celo.",
     timelineLoadFailed: "Las pruebas locales estan visibles. El historial de Celo se reintentara automaticamente.",
-    openTimelineApi: "Abrir datos de Celo",
     networkReady: "Celo Mainnet listo",
     offlineReady: "Listo sin internet",
     saveQrPdf: "Haz clic aqui para guardar el QR como PDF",
@@ -512,6 +511,12 @@ function sendPendingBeforeLeave() {
   }
 }
 
+function refreshAfterOnline() {
+  if (sessionStorage.getItem(ONLINE_RELOAD_KEY) === "1") return;
+  sessionStorage.setItem(ONLINE_RELOAD_KEY, "1");
+  setTimeout(() => window.location.reload(), 1200);
+}
+
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach((screen) => {
     screen.classList.toggle("is-active", screen.id === `screen-${name}`);
@@ -530,7 +535,6 @@ function applyLanguage() {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   });
   $("languageToggle").querySelector("strong").textContent = state.language === "en" ? "ES" : "EN";
-  $("timelineApiLink").href = `${TIMELINE_ENDPOINT}?limit=75`;
 }
 
 function render() {
@@ -603,15 +607,17 @@ $("languageToggle").addEventListener("click", () => {
   saveState();
 });
 
-window.addEventListener("online", () => {
+window.addEventListener("online", async () => {
   render();
-  loadOnchainTimeline({ silent: true });
   if (state.events.some((event) => event.status === "pending")) {
     notify(t("onlineSyncing"));
-    autoSyncPending();
+    await autoSyncPending();
   }
+  await loadOnchainTimeline({ silent: true });
+  refreshAfterOnline();
 });
 window.addEventListener("offline", () => {
+  sessionStorage.removeItem(ONLINE_RELOAD_KEY);
   render();
   notify(t("offlineSaved"));
 });

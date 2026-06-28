@@ -1,4 +1,4 @@
-const CACHE = "aidtrace-v7";
+const CACHE = "aidtrace-v8";
 const DB_NAME = "aidtrace-sync-db";
 const STORE = "packets";
 const ASSETS = ["./index.html", "./styles.css", "./qrcode.js", "./app.js", "./manifest.webmanifest"];

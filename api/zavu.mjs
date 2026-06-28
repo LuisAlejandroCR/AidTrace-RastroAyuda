@@ -18,6 +18,15 @@ const CELO_RPC_URL = process.env.CELO_RPC_URL || "https://forno.celo.org";
 const CELOSCAN_TX_BASE = process.env.CELOSCAN_TX_BASE || "https://celoscan.io/tx";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const CELO_WRITE_GAP_MS = Number(process.env.AIDTRACE_CELO_WRITE_GAP_MS || "1800");
+const CELO_LOCK_WAIT_MS = Number(process.env.AIDTRACE_CELO_LOCK_WAIT_MS || "25000");
+const CELO_LOCK_TTL_MS = Number(process.env.AIDTRACE_CELO_LOCK_TTL_MS || "45000");
+const CELO_LOCK_POLL_MS = Number(process.env.AIDTRACE_CELO_LOCK_POLL_MS || "500");
+const CELO_LOCK_KEY = process.env.AIDTRACE_CELO_LOCK_KEY || "aidtrace:celo-write-lock";
+const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const SUPABASE_LOCK_TABLE = process.env.AIDTRACE_SUPABASE_LOCK_TABLE || "aidtrace_locks";
+const REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "";
+const REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "";
 let celoWriteQueue = Promise.resolve();
 
 const abi = [
@@ -50,11 +59,177 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function hasDistributedLock() {
+  return Boolean((SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) || (REDIS_REST_URL && REDIS_REST_TOKEN));
+}
+
+function hasSupabaseLock() {
+  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function supabaseHeaders(prefer = "") {
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    "Content-Type": "application/json",
+    ...(prefer ? { Prefer: prefer } : {}),
+  };
+}
+
+async function supabaseRequest(path, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      ...supabaseHeaders(options.prefer),
+      ...(options.headers || {}),
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Supabase lock error: ${response.status} ${text}`);
+  }
+
+  if (response.status === 204) return null;
+  return response.json();
+}
+
+async function clearExpiredSupabaseLock(nowIso) {
+  await supabaseRequest(
+    `${SUPABASE_LOCK_TABLE}?lock_key=eq.${encodeURIComponent(CELO_LOCK_KEY)}&expires_at=lt.${encodeURIComponent(nowIso)}`,
+    {
+      method: "DELETE",
+      prefer: "return=minimal",
+    },
+  );
+}
+
+async function tryAcquireSupabaseLock(lockValue) {
+  const now = new Date();
+  await clearExpiredSupabaseLock(now.toISOString());
+
+  const expiresAt = new Date(now.getTime() + CELO_LOCK_TTL_MS).toISOString();
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_LOCK_TABLE}?on_conflict=lock_key`, {
+    method: "POST",
+    headers: supabaseHeaders("resolution=ignore-duplicates,return=representation"),
+    body: JSON.stringify({
+      lock_key: CELO_LOCK_KEY,
+      lock_value: lockValue,
+      expires_at: expiresAt,
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Supabase lock error: ${response.status} ${text}`);
+  }
+
+  const rows = await response.json();
+  return Array.isArray(rows) && rows.length === 1;
+}
+
+async function acquireSupabaseLock() {
+  const lockValue = randomUUID();
+  const deadline = Date.now() + CELO_LOCK_WAIT_MS;
+
+  while (Date.now() < deadline) {
+    if (await tryAcquireSupabaseLock(lockValue)) return lockValue;
+    await sleep(CELO_LOCK_POLL_MS);
+  }
+
+  throw new Error("Celo write queue is busy. Try again in a few seconds.");
+}
+
+async function releaseSupabaseLock(lockValue) {
+  if (!lockValue) return;
+  await supabaseRequest(
+    `${SUPABASE_LOCK_TABLE}?lock_key=eq.${encodeURIComponent(CELO_LOCK_KEY)}&lock_value=eq.${encodeURIComponent(lockValue)}`,
+    {
+      method: "DELETE",
+      prefer: "return=minimal",
+    },
+  );
+}
+
+function hasRedisLock() {
+  return Boolean(REDIS_REST_URL && REDIS_REST_TOKEN);
+}
+
+async function redisCommand(command) {
+  const response = await fetch(REDIS_REST_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${REDIS_REST_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(command),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Redis lock error: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  if (payload.error) {
+    throw new Error(`Redis lock error: ${payload.error}`);
+  }
+
+  return payload.result;
+}
+
+async function acquireDistributedLock() {
+  if (hasSupabaseLock()) {
+    return { provider: "supabase", value: await acquireSupabaseLock() };
+  }
+
+  if (!hasRedisLock()) return null;
+
+  const lockValue = randomUUID();
+  const deadline = Date.now() + CELO_LOCK_WAIT_MS;
+
+  while (Date.now() < deadline) {
+    const result = await redisCommand(["SET", CELO_LOCK_KEY, lockValue, "NX", "PX", CELO_LOCK_TTL_MS]);
+    if (result === "OK") return { provider: "redis", value: lockValue };
+    await sleep(CELO_LOCK_POLL_MS);
+  }
+
+  throw new Error("Celo write queue is busy. Try again in a few seconds.");
+}
+
+async function releaseDistributedLock(lock) {
+  if (!lock) return;
+
+  if (lock.provider === "supabase") {
+    await releaseSupabaseLock(lock.value);
+    return;
+  }
+
+  if (lock.provider !== "redis" || !hasRedisLock()) return;
+
+  const releaseScript = `
+    if redis.call("get", KEYS[1]) == ARGV[1] then
+      return redis.call("del", KEYS[1])
+    end
+    return 0
+  `;
+
+  await redisCommand(["EVAL", releaseScript, "1", CELO_LOCK_KEY, lock.value]);
+}
+
 async function enqueueCeloWrite(work) {
   const queued = celoWriteQueue.then(async () => {
-    const result = await work();
-    await sleep(CELO_WRITE_GAP_MS);
-    return result;
+    const lockValue = await acquireDistributedLock();
+    try {
+      const result = await work();
+      await sleep(CELO_WRITE_GAP_MS);
+      return result;
+    } finally {
+      try {
+        await releaseDistributedLock(lockValue);
+      } catch (error) {
+        console.error("Celo lock release failed:", error);
+      }
+    }
   });
 
   celoWriteQueue = queued.catch(() => {});

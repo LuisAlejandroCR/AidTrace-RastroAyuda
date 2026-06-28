@@ -233,20 +233,6 @@ button {
   justify-content: end;
 }
 
-.audit-link {
-  min-height: 42px;
-  display: inline-grid;
-  place-items: center;
-  border: 1px solid var(--sage-dark);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--sage-dark);
-  font-size: 0.82rem;
-  font-weight: 900;
-  padding: 9px 14px;
-  text-decoration: none;
-}
-
 .timeline {
   display: grid;
   gap: 12px;

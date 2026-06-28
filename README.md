@@ -342,6 +342,53 @@ Auditoria: abre el link, ve a Logs y baja hasta data / referenceURI.
 
 Use Zavu `idempotencyKey` from inbound `messageId + batchId + actionType` to avoid duplicate confirmations. Use the inbound phone number as the off-chain sender identity; do not put personal phone numbers directly on-chain.
 
+### Celo Write Queue / Lock
+
+Telegram can deliver several offline messages at once. Because all on-chain writes use the same relayer wallet, the webhook must serialize Celo transactions or the relayer can hit nonce races such as `replacement transaction underpriced`.
+
+The deployed `api/zavu.mjs` supports a distributed Supabase Postgres lock. It still has an in-memory queue for local dev, but production should set the Supabase env vars so parallel Vercel instances share the same lock.
+
+Create the lock table in Supabase SQL Editor:
+
+```sql
+create table if not exists public.aidtrace_locks (
+  lock_key text primary key,
+  lock_value text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.aidtrace_locks enable row level security;
+```
+
+Use the server-only service role key from Supabase. Do not expose it in browser code.
+
+Vercel env vars:
+
+```text
+SUPABASE_URL=<supabase_project_url>
+SUPABASE_SERVICE_ROLE_KEY=<supabase_service_role_key>
+```
+
+Optional tuning:
+
+```text
+AIDTRACE_CELO_WRITE_GAP_MS=1800
+AIDTRACE_CELO_LOCK_WAIT_MS=25000
+AIDTRACE_CELO_LOCK_TTL_MS=45000
+AIDTRACE_CELO_LOCK_KEY=aidtrace:celo-write-lock
+AIDTRACE_SUPABASE_LOCK_TABLE=aidtrace_locks
+```
+
+Keep the lock TTL longer than one expected Celo write plus confirmation wait. If the function crashes, the lock expires automatically.
+
+Redis fallback remains supported if these env vars exist instead:
+
+```text
+UPSTASH_REDIS_REST_URL=<upstash_rest_url>
+UPSTASH_REDIS_REST_TOKEN=<upstash_rest_token>
+```
+
 ## Block 10: Test Path
 
 Run this order:
