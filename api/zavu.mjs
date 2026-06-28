@@ -250,12 +250,16 @@ function relayEventToParsed(event) {
     throw new Error("Relay event missing batchId/actionType");
   }
 
+  const rawAction = normalizeCommandPart(event.actionType);
+  const actionType = ACTION_ALIASES[rawAction] || rawAction;
+
   return {
-    actionType: String(event.actionType).toUpperCase(),
+    actionType,
     batchId: String(event.batchId).toUpperCase(),
     details: event.note || event.locationText || event.senderName || "sin detalles",
   };
 }
+
 
 async function handleBrowserRelay(packet, res) {
   const pending = Array.isArray(packet.pending) ? packet.pending : [];

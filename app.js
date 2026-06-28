@@ -358,25 +358,39 @@ async function postRelayPacket(useBeacon = false) {
 
 async function autoSyncPending() {
   const pending = state.events.filter((event) => event.status === "pending");
-  if (!navigator.onLine || !pending.length || !RELAY_ENDPOINT) return;
+
+  if (!navigator.onLine || !pending.length || !RELAY_ENDPOINT || syncInFlight) {
+    return false;
+  }
+
+  syncInFlight = true;
   notify(t("onlineSyncing"));
+
   try {
     const relayResult = await postRelayPacket();
     const recorded = relayResult?.recorded || [];
     const txById = new Map(recorded.map((item) => [item.id, item.txHash]));
     const syncedAt = new Date().toISOString();
+
     for (const event of pending) {
       const txHash = txById.get(event.id);
+
       if (txHash) {
         event.status = "sent_to_relayer";
         event.syncedAt = syncedAt;
         event.txHash = txHash;
       }
     }
+
     saveState();
     notify(recorded.length === pending.length ? t("syncDone") : t("syncPartial"));
-  } catch {
+    return true;
+  } catch (error) {
+    console.error("AidTrace sync failed:", error);
     notify(t("syncFailed"));
+    return false;
+  } finally {
+    syncInFlight = false;
   }
 }
 
@@ -501,11 +515,31 @@ $("languageToggle").addEventListener("click", () => {
 
 window.addEventListener("online", () => {
   render();
-  if (state.events.some((event) => event.status === "pending")) {
-    notify(t("onlineSyncing"));
+  autoSyncPending();
+});
+
+window.addEventListener("pageshow", () => {
+  render();
+  autoSyncPending();
+});
+
+window.addEventListener("focus", () => {
+  autoSyncPending();
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
     autoSyncPending();
   }
 });
+
+setInterval(() => {
+  if (navigator.onLine) {
+    autoSyncPending();
+  }
+}, 15000);
+
+
 window.addEventListener("offline", () => {
   render();
   notify(t("offlineSaved"));
