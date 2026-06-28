@@ -154,6 +154,27 @@ const translations = {
   },
 };
 
+const CHAIN_TIMELINE_ENDPOINT = "/api/timeline";
+let chainEvents = [];
+
+async function loadChainTimeline() {
+  if (!navigator.onLine) return;
+
+  try {
+    const response = await fetch(CHAIN_TIMELINE_ENDPOINT);
+
+    if (!response.ok) {
+      throw new Error(`Timeline failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    chainEvents = result.events || [];
+    render();
+  } catch (error) {
+    console.warn("Could not load Celo timeline:", error);
+  }
+}
+
 const defaultState = {
   language: "en",
   batches: [],
@@ -226,13 +247,21 @@ function batchLink(batchId) {
 function actionLabel(actionType) {
   const labels = {
     CREATED: t("actionCreated"),
+
+    PICKUP: t("actionPickedUp"),
     PICKED_UP: t("actionPickedUp"),
-    ARRIVED: t("actionArrived"),
+
+    DELIVER: t("actionDelivered"),
     DELIVERED: t("actionDelivered"),
-    DAMAGED: t("actionDamaged"),
+
+    REVIEW: t("actionNeedsReview"),
     NEEDS_REVIEW: t("actionNeedsReview"),
+
+    ARRIVED: t("actionArrived"),
+    DAMAGED: t("actionDamaged"),
     SMS_CONFIRMED: t("actionSmsConfirmed"),
   };
+
   return labels[actionType] || String(actionType || "").replaceAll("_", " ");
 }
 
@@ -437,23 +466,35 @@ function render() {
 
   const timeline = $("timeline");
   timeline.textContent = "";
-  if (!state.events.length) {
+
+  const localPendingEvents = state.events.filter((event) => event.status === "pending");
+
+  const timelineEvents = [...chainEvents, ...localPendingEvents].sort((a, b) => {
+    const dateA = Date.parse(a.blockTimestamp || a.createdAt || 0);
+    const dateB = Date.parse(b.blockTimestamp || b.createdAt || 0);
+    return dateB - dateA;
+  });
+
+  if (!timelineEvents.length) {
     timeline.innerHTML = `<p class="hint">${t("empty")}</p>`;
     return;
   }
 
   const template = $("itemTemplate");
-  for (const event of state.events) {
+  for (const event of timelineEvents) {  
     const node = template.content.cloneNode(true);
     const tag = node.querySelector(".tag");
-    const link = batchLink(event.batchId);
+    const txUrl = event.txUrl || (event.txHash ? `${NETWORK.txExplorer}/${event.txHash}` : "");
+    const link = txUrl || batchLink(event.batchId);    
     tag.innerHTML = `
       ${qrSvg(link)}
       <span>${event.batchId}</span>
       <button class="qr-download" type="button" data-batch-id="${event.batchId}" data-batch-link="${link}">${t("saveQrPdf")}</button>
     `;
     node.querySelector("h3").textContent = `${actionLabel(event.actionType)} - ${statusLabel(event.status)}`;
-    node.querySelector("p").textContent = `${event.senderName} - ${event.locationText}. ${event.note || ""}`.trim();
+    node.querySelector("p").textContent = event.details
+  ? event.details
+  : `${event.senderName || ""} - ${event.locationText || ""}. ${event.note || ""}`.trim();    
     const proof = node.querySelector("small");
     if (event.txHash) {
       proof.innerHTML = `${t("relayerPacketSent")} - <a href="${NETWORK.txExplorer}/${event.txHash}" target="_blank" rel="noreferrer">${t("txLink")}</a>`;
@@ -499,13 +540,6 @@ $("languageToggle").addEventListener("click", () => {
   saveState();
 });
 
-window.addEventListener("online", () => {
-  render();
-  if (state.events.some((event) => event.status === "pending")) {
-    notify(t("onlineSyncing"));
-    autoSyncPending();
-  }
-});
 window.addEventListener("offline", () => {
   render();
   notify(t("offlineSaved"));
@@ -518,3 +552,18 @@ if ("serviceWorker" in navigator) {
 
 render();
 hydrateBatchFromUrl();
+
+loadChainTimeline();
+
+window.addEventListener("focus", loadChainTimeline);
+window.addEventListener("pageshow", loadChainTimeline);
+
+window.addEventListener("online", () => {
+  render();
+  loadChainTimeline();
+
+  if (state.events.some((event) => event.status === "pending")) {
+    notify(t("onlineSyncing"));
+    autoSyncPending();
+  }
+});
