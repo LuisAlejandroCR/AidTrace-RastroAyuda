@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   createPublicClient,
   createWalletClient,
+  getAddress,
   http,
   keccak256,
   stringToHex,
@@ -69,6 +70,10 @@ function getMessageId(event, data) {
   return data.messageId || data.id || event.id || randomUUID();
 }
 
+function normalizeAddress(value) {
+  return getAddress(String(value).toLowerCase());
+}
+
 async function recordOnCelo(event, data, parsed) {
   const privateKey = process.env.RASTROAYUDA_RELAYER_PRIVATE_KEY;
 
@@ -106,7 +111,7 @@ async function recordOnCelo(event, data, parsed) {
   });
 
   const txHash = await walletClient.writeContract({
-    address: CONTRACT_ADDRESS,
+    address: normalizeAddress(CONTRACT_ADDRESS),
     abi,
     functionName: "recordAction",
     args: [
