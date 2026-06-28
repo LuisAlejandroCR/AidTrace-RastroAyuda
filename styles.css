@@ -341,6 +341,13 @@ button {
   color: var(--muted);
 }
 
+.timeline-item .event-time {
+  margin-top: 5px;
+  color: var(--sage-dark);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
 .timeline-item small {
   display: block;
   margin-top: 10px;

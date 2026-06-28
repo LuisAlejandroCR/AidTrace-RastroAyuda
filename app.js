@@ -82,6 +82,7 @@ const translations = {
     offlineReady: "Offline ready",
     saveQrPdf: "Click here to save the QR as PDF",
     txLink: "View Celo transaction",
+    txTime: "Time",
     localProof: "Saved locally",
     relayerPacketSent: "Saved on Celo",
     pendingProofs: "pending",
@@ -162,6 +163,7 @@ const translations = {
     offlineReady: "Listo sin internet",
     saveQrPdf: "Haz clic aqui para guardar el QR como PDF",
     txLink: "Ver transaccion en Celo",
+    txTime: "Hora",
     localProof: "Guardado localmente",
     relayerPacketSent: "Guardado en Celo",
     pendingProofs: "pendiente",
@@ -315,6 +317,15 @@ function eventDescription(event) {
 
 function eventTimestamp(event) {
   return event.blockTimestamp || event.syncedAt || event.createdAt || new Date().toISOString();
+}
+
+function formatEventTime(event) {
+  const timestamp = eventTimestamp(event);
+  if (!timestamp) return "";
+  return new Date(timestamp).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 }
 
 function mergeEvents(incomingEvents) {
@@ -630,6 +641,10 @@ function render() {
     `;
     node.querySelector("h3").textContent = `${actionLabel(event.actionType)} - ${statusLabel(event.status)}`;
     node.querySelector("p").textContent = eventDescription(event);
+    const time = document.createElement("p");
+    time.className = "event-time";
+    time.textContent = `${t("txTime")}: ${formatEventTime(event)}`;
+    node.querySelector("p").after(time);
     const proof = node.querySelector("small");
     if (event.txHash) {
       proof.innerHTML = `${t("relayerPacketSent")} - <a href="${NETWORK.txExplorer}/${event.txHash}" target="_blank" rel="noreferrer">${t("txLink")}</a>`;
