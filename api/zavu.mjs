@@ -15,6 +15,7 @@ import { celo } from "viem/chains";
 const CONTRACT_ADDRESS =
   process.env.AIDTRACE_CONTRACT || "0xaf5c40e82ac9255479a1f447e81992b71c4f4934";
 const CELO_RPC_URL = process.env.CELO_RPC_URL || "https://forno.celo.org";
+const CELOSCAN_TX_BASE = process.env.CELOSCAN_TX_BASE || "https://celoscan.io/tx";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 const abi = [
@@ -287,7 +288,8 @@ function buildSuccessReply(parsed, txHash) {
   return [
     `Registrado en Celo: ${parsed.actionType} ${parsed.batchId}`,
     `Detalles: ${parsed.details}`,
-    `Tx: ${txHash}`,
+    `Tx: ${CELOSCAN_TX_BASE}/${txHash}`,
+    "Auditoria: abre el link, ve a Logs y baja hasta data / referenceURI.",
   ].join("\n");
 }
 

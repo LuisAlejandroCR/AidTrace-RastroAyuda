@@ -2,6 +2,16 @@
 
 Offline-first custody tracking for humanitarian supplies, anchored on Celo and reachable through browser and Telegram today. SMS and WhatsApp are future channel adapters.
 
+## Audit A Transaction
+
+Open the Celoscan link from the bot reply, go to `Logs`, and scroll down until `data` / `referenceURI`. The `referenceURI` value contains the public audit memo, for example:
+
+```text
+zavu:<message_id> | DELIVER AT-CELO-1 | 100 aguas refugio mayor
+```
+
+`dataHash` is the private proof of the full normalized record; `referenceURI` is the human-readable audit summary.
+
 ## Current Architecture
 
 - Static PWA: creates QR labels, records custody events, stores pending events locally, and posts relay packets when online.
@@ -319,7 +329,16 @@ Relayer behavior:
 3. Hash the normalized event.
 4. Call `recordAction(batchId, actionType, dataHash, sender, referenceURI)`.
 5. Put a short public audit memo in `referenceURI` so explorers show what happened without exposing the full normalized payload.
-6. Reply through Zavu with a short confirmation.
+6. Reply through Zavu with a short confirmation and full Celoscan transaction link.
+
+Reply format:
+
+```text
+Registrado en Celo: DELIVER AT-CELO-1
+Detalles: 100 aguas refugio mayor
+Tx: https://celoscan.io/tx/<tx_hash>
+Auditoria: abre el link, ve a Logs y baja hasta data / referenceURI.
+```
 
 Use Zavu `idempotencyKey` from inbound `messageId + batchId + actionType` to avoid duplicate confirmations. Use the inbound phone number as the off-chain sender identity; do not put personal phone numbers directly on-chain.
 
