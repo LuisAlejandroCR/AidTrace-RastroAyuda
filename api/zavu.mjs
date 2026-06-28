@@ -37,24 +37,76 @@ const zavu = new Zavudev({
   apiKey: process.env.RASTROAYUDA_ZAVU_API_KEY,
 });
 
+const ACTION_ALIASES = {
+  PICKUP: "PICKUP",
+  PICKED_UP: "PICKUP",
+  RECOGER: "PICKUP",
+  RECOGIDO: "PICKUP",
+  RETIRO: "PICKUP",
+  RECIBIR: "PICKUP",
+  DELIVER: "DELIVER",
+  DELIVERED: "DELIVER",
+  DELIVERY: "DELIVER",
+  ENTREGAR: "DELIVER",
+  ENTREGADO: "DELIVER",
+  ENTREGA: "DELIVER",
+  REVIEW: "REVIEW",
+  REVISAR: "REVIEW",
+  REVISION: "REVIEW",
+  REVISADO: "REVIEW",
+  REPORTE: "REVIEW",
+};
+
+const COMMAND_PREFIXES = new Set(["AT", "AIDTRACE", "RASTROAYUDA", "RASTRO"]);
+const HELP_WORDS = new Set(["HELP", "AYUDA", "START", "INICIO"]);
+
 function bytes32Text(value) {
   return stringToHex(String(value).toUpperCase().slice(0, 31), { size: 32 });
 }
 
+function normalizeCommandPart(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase();
+}
+
+function usageMessage() {
+  return [
+    "Formato no reconocido.",
+    "Usa: AT DELIVER AT-DEMO-001 detalles",
+    "O: AT ENTREGAR AT-DEMO-001 detalles",
+    "Acciones: PICKUP/RECOGER, DELIVER/ENTREGAR, REVIEW/REVISAR",
+  ].join("\n");
+}
+
 function parseAidTraceText(text) {
   const clean = String(text || "").trim();
-  const match = clean.match(
-    /^AT\s+(PICKUP|DELIVER|REVIEW)\s+([A-Za-z0-9-_]+)\s*(.*)$/i,
-  );
+  const parts = clean.split(/\s+/).filter(Boolean);
 
-  if (!match) {
-    throw new Error("Formato no reconocido. Usa: AT PICKUP BATCH-001 detalles");
+  if (!parts.length) {
+    throw new Error(usageMessage());
+  }
+
+  if (HELP_WORDS.has(normalizeCommandPart(parts[0]))) {
+    throw new Error(usageMessage());
+  }
+
+  if (COMMAND_PREFIXES.has(normalizeCommandPart(parts[0]))) {
+    parts.shift();
+  }
+
+  const actionType = ACTION_ALIASES[normalizeCommandPart(parts[0])];
+  const batchId = parts[1];
+
+  if (!actionType || !batchId) {
+    throw new Error(usageMessage());
   }
 
   return {
-    actionType: match[1].toUpperCase(),
-    batchId: match[2].toUpperCase(),
-    details: match[3] || "sin detalles",
+    actionType,
+    batchId: batchId.toUpperCase(),
+    details: parts.slice(2).join(" ") || "sin detalles",
   };
 }
 
@@ -74,8 +126,10 @@ function normalizeAddress(value) {
   return getAddress(String(value).toLowerCase());
 }
 
-async function recordOnCelo(event, data, parsed) {
+async function recordOnCelo(event, data, parsed, options = {}) {
   const privateKey = process.env.RASTROAYUDA_RELAYER_PRIVATE_KEY;
+  const messageId = options.messageId || getMessageId(event, data);
+  const source = options.source || "zavu";
 
   if (!privateKey) {
     throw new Error("Missing RASTROAYUDA_RELAYER_PRIVATE_KEY");
@@ -85,9 +139,8 @@ async function recordOnCelo(event, data, parsed) {
     throw new Error("Missing AIDTRACE_CONTRACT");
   }
 
-  const messageId = getMessageId(event, data);
   const normalized = {
-    source: "zavu",
+    source,
     channel: data.channel,
     from: data.from,
     telegramChatId: data.telegramChatId,
@@ -96,6 +149,7 @@ async function recordOnCelo(event, data, parsed) {
     batchId: parsed.batchId,
     details: parsed.details,
     receivedAt: new Date().toISOString(),
+    ...(options.extraData || {}),
   };
 
   const account = privateKeyToAccount(privateKey);
@@ -119,7 +173,7 @@ async function recordOnCelo(event, data, parsed) {
       bytes32Text(parsed.actionType),
       keccak256(stringToBytes(JSON.stringify(normalized))),
       ZERO_ADDRESS,
-      `zavu:${messageId}`,
+      options.referenceURI || `${source}:${messageId}`,
     ],
   });
 
@@ -130,6 +184,51 @@ async function recordOnCelo(event, data, parsed) {
   }
 
   return { messageId, txHash };
+}
+
+function relayEventToParsed(event) {
+  if (!event?.batchId || !event?.actionType) {
+    throw new Error("Relay event missing batchId/actionType");
+  }
+
+  return {
+    actionType: String(event.actionType).toUpperCase(),
+    batchId: String(event.batchId).toUpperCase(),
+    details: event.note || event.locationText || event.senderName || "sin detalles",
+  };
+}
+
+async function handleBrowserRelay(packet, res) {
+  const pending = Array.isArray(packet.pending) ? packet.pending : [];
+  const recorded = [];
+
+  for (const item of pending) {
+    const parsed = relayEventToParsed(item);
+    const result = await recordOnCelo(
+      { id: item.id || randomUUID() },
+      {
+        channel: "browser",
+        from: item.senderName || "AidTrace browser",
+        messageId: item.id,
+      },
+      parsed,
+      {
+        source: "browser",
+        messageId: item.id,
+        referenceURI: item.ref || `aidtrace:${parsed.batchId}`,
+        extraData: item,
+      },
+    );
+
+    recorded.push({
+      id: item.id,
+      batchId: parsed.batchId,
+      actionType: parsed.actionType,
+      txHash: result.txHash,
+    });
+  }
+
+  return res.status(200).json({ ok: true, recorded });
 }
 
 function buildSuccessReply(parsed, txHash) {
@@ -149,6 +248,10 @@ export default async function handler(req, res) {
     const event = req.body || {};
 
     console.log("Zavu event:", JSON.stringify(event, null, 2));
+
+    if (event.schema === "aidtrace.relay.v1") {
+      return handleBrowserRelay(event, res);
+    }
 
     if (event.type !== "message.inbound") {
       return res.status(200).send("Ignored");
