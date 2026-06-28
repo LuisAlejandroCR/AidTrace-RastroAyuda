@@ -260,34 +260,49 @@ function relayEventToParsed(event) {
 async function handleBrowserRelay(packet, res) {
   const pending = Array.isArray(packet.pending) ? packet.pending : [];
   const recorded = [];
+  const failed = [];
 
   for (const item of pending) {
-    const parsed = relayEventToParsed(item);
-    const result = await recordOnCelo(
-      { id: item.id || randomUUID() },
-      {
-        channel: "browser",
-        from: item.senderName || "AidTrace browser",
-        messageId: item.id,
-      },
-      parsed,
-      {
-        source: "browser",
-        messageId: item.id,
-        referenceURI: item.ref || `aidtrace:${parsed.batchId}`,
-        extraData: item,
-      },
-    );
+    try {
+      const parsed = relayEventToParsed(item);
+      const result = await recordOnCelo(
+        { id: item.id || randomUUID() },
+        {
+          channel: "browser",
+          from: item.senderName || "AidTrace browser",
+          messageId: item.id,
+        },
+        parsed,
+        {
+          source: "browser",
+          messageId: item.id,
+          referenceURI: item.ref || `aidtrace:${parsed.batchId}`,
+          extraData: item,
+        },
+      );
 
-    recorded.push({
-      id: item.id,
-      batchId: parsed.batchId,
-      actionType: parsed.actionType,
-      txHash: result.txHash,
-    });
+      recorded.push({
+        id: item.id,
+        batchId: parsed.batchId,
+        actionType: parsed.actionType,
+        txHash: result.txHash,
+      });
+    } catch (error) {
+      console.error("Browser relay item failed:", item?.id, error);
+      failed.push({
+        id: item?.id,
+        batchId: item?.batchId,
+        actionType: item?.actionType,
+        error: error.message || "Relay item failed",
+      });
+    }
   }
 
-  return res.status(200).json({ ok: true, recorded });
+  return res.status(failed.length ? 207 : 200).json({
+    ok: failed.length === 0,
+    recorded,
+    failed,
+  });
 }
 
 function buildSuccessReply(parsed, txHash) {

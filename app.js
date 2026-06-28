@@ -26,7 +26,7 @@ const translations = {
     createIntro: "Create a QR label first. Phone cameras can read it and reopen this batch automatically.",
     updateEyebrow: "Field action",
     updateTitle: "Record custody event",
-    updateIntro: "Use the QR code, typed code, WhatsApp, or SMS to record what happened.",
+    updateIntro: "Use the QR code, typed code, or Telegram bot to record what happened.",
     timelineEyebrow: "Supervisor",
     timelineTitle: "Proof timeline",
     supplyType: "Supply type",
@@ -64,13 +64,24 @@ const translations = {
     savedLocal: "Saved locally. AidTrace will sync automatically when internet is available.",
     offlineSaved: "You're offline, no worries. This process was stored locally and will sync automatically once you are online.",
     onlineSyncing: "You're online. We're syncing pending proofs now.",
-    syncDone: "Sync complete. Pending proofs were sent to the relayer.",
+    syncDone: "Sync complete. Pending proofs were saved on Celo.",
+    syncPartial: "Some proofs were saved on Celo. The pending ones will retry automatically.",
     syncNeedsRelay: "Saved locally. AidTrace will sync automatically when the relayer is configured.",
-    syncFailed: "The relayer did not accept the proofs yet. AidTrace will retry automatically.",
-    downloadQr: "Click here to download the QR",
+    syncFailed: "AidTrace could not save these proofs on Celo yet. It will retry automatically.",
+    saveQrPdf: "Click here to save the QR as PDF",
     txLink: "View Celo transaction",
-    localProof: "Local proof",
-    relayerPacketSent: "Relayer packet sent",
+    localProof: "Saved locally",
+    relayerPacketSent: "Saved on Celo",
+    pendingProofs: "pending",
+    statusPending: "pending",
+    statusSynced: "saved on Celo",
+    actionCreated: "Created",
+    actionPickedUp: "Picked up",
+    actionArrived: "Arrived",
+    actionDelivered: "Delivered",
+    actionDamaged: "Damaged",
+    actionNeedsReview: "Needs review",
+    actionSmsConfirmed: "SMS confirmed",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -84,7 +95,7 @@ const translations = {
     createIntro: "Primero crea la etiqueta QR. La camara del telefono puede leerla y reabrir este lote automaticamente.",
     updateEyebrow: "Accion en campo",
     updateTitle: "Registrar evento de custodia",
-    updateIntro: "Usa el QR, codigo escrito, WhatsApp o SMS para registrar lo ocurrido.",
+    updateIntro: "Usa el QR, codigo escrito o bot de Telegram para registrar lo ocurrido.",
     timelineEyebrow: "Supervisor",
     timelineTitle: "Historial de pruebas",
     supplyType: "Tipo de insumo",
@@ -122,13 +133,24 @@ const translations = {
     savedLocal: "Guardado localmente. AidTrace sincronizara automaticamente cuando haya internet.",
     offlineSaved: "Estas offline, no te preocupes. El proceso se guardo localmente y se sincronizara automaticamente cuando estes online.",
     onlineSyncing: "Estas online. Estamos sincronizando las pruebas pendientes.",
-    syncDone: "Sincronizacion completa. Las pruebas pendientes fueron enviadas al relayer.",
+    syncDone: "Sincronizacion completa. Las pruebas pendientes fueron guardadas en Celo.",
+    syncPartial: "Algunas pruebas fueron guardadas en Celo. Las pendientes se reintentaran automaticamente.",
     syncNeedsRelay: "Guardado localmente. AidTrace sincronizara automaticamente cuando el relayer este configurado.",
-    syncFailed: "El relayer aun no acepto las pruebas. AidTrace reintentara automaticamente.",
-    downloadQr: "Haz clic aqui para descargar el QR",
+    syncFailed: "AidTrace aun no pudo guardar estas pruebas en Celo. Se reintentara automaticamente.",
+    saveQrPdf: "Haz clic aqui para guardar el QR como PDF",
     txLink: "Ver transaccion en Celo",
-    localProof: "Prueba local",
-    relayerPacketSent: "Paquete enviado al relayer",
+    localProof: "Guardado localmente",
+    relayerPacketSent: "Guardado en Celo",
+    pendingProofs: "pendiente",
+    statusPending: "pendiente",
+    statusSynced: "guardado en Celo",
+    actionCreated: "Creado",
+    actionPickedUp: "Recogido",
+    actionArrived: "Llego",
+    actionDelivered: "Entregado",
+    actionDamaged: "Danado",
+    actionNeedsReview: "Requiere revision",
+    actionSmsConfirmed: "Confirmado por SMS",
   },
 };
 
@@ -199,6 +221,54 @@ function batchLink(batchId) {
   url.hash = "";
   url.searchParams.set("batch", batchId);
   return url.toString();
+}
+
+function actionLabel(actionType) {
+  const labels = {
+    CREATED: t("actionCreated"),
+    PICKED_UP: t("actionPickedUp"),
+    ARRIVED: t("actionArrived"),
+    DELIVERED: t("actionDelivered"),
+    DAMAGED: t("actionDamaged"),
+    NEEDS_REVIEW: t("actionNeedsReview"),
+    SMS_CONFIRMED: t("actionSmsConfirmed"),
+  };
+  return labels[actionType] || String(actionType || "").replaceAll("_", " ");
+}
+
+function statusLabel(status) {
+  if (status === "sent_to_relayer") return t("statusSynced");
+  if (status === "pending") return t("statusPending");
+  return String(status || "");
+}
+
+function printQrPdf(batchId, link) {
+  const win = window.open("", "_blank", "noopener,noreferrer");
+  if (!win) return;
+  win.document.write(`<!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${batchId} QR</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
+          .label { width: 320px; border: 1px solid #111; padding: 18px; text-align: center; }
+          svg { width: 220px; height: 220px; }
+          h1 { font-size: 24px; margin: 0 0 8px; }
+          p { overflow-wrap: anywhere; }
+        </style>
+      </head>
+      <body>
+        <div class="label">
+          <h1>AidTrace</h1>
+          ${qrSvg(link)}
+          <h2>${batchId}</h2>
+          <p>${link}</p>
+        </div>
+        <script>window.onload = () => { window.print(); };</script>
+      </body>
+    </html>`);
+  win.document.close();
 }
 
 async function queueEvent(payload) {
@@ -282,7 +352,7 @@ async function postRelayPacket(useBeacon = false) {
     headers: { "Content-Type": "application/json" },
     body,
   });
-  if (!response.ok) throw new Error(`Relay failed: ${response.status}`);
+  if (!response.ok && response.status !== 207) throw new Error(`Relay failed: ${response.status}`);
   return response.json();
 }
 
@@ -292,15 +362,19 @@ async function autoSyncPending() {
   notify(t("onlineSyncing"));
   try {
     const relayResult = await postRelayPacket();
-    const txById = new Map((relayResult?.recorded || []).map((item) => [item.id, item.txHash]));
+    const recorded = relayResult?.recorded || [];
+    const txById = new Map(recorded.map((item) => [item.id, item.txHash]));
     const syncedAt = new Date().toISOString();
     for (const event of pending) {
-      event.status = "sent_to_relayer";
-      event.syncedAt = syncedAt;
-      event.txHash = txById.get(event.id) || event.txHash || "";
+      const txHash = txById.get(event.id);
+      if (txHash) {
+        event.status = "sent_to_relayer";
+        event.syncedAt = syncedAt;
+        event.txHash = txHash;
+      }
     }
     saveState();
-    notify(t("syncDone"));
+    notify(recorded.length === pending.length ? t("syncDone") : t("syncPartial"));
   } catch {
     notify(t("syncFailed"));
   }
@@ -359,7 +433,7 @@ function render() {
   applyLanguage();
   const pendingCount = state.events.filter((event) => event.status === "pending").length;
   $("networkState").textContent = navigator.onLine ? `${NETWORK.name} ready` : "Offline ready";
-  $("queueState").textContent = `${pendingCount} pending - ${NETWORK.name}`;
+  $("queueState").textContent = `${pendingCount} ${t("pendingProofs")} - ${NETWORK.name}`;
 
   const timeline = $("timeline");
   timeline.textContent = "";
@@ -376,9 +450,9 @@ function render() {
     tag.innerHTML = `
       ${qrSvg(link)}
       <span>${event.batchId}</span>
-      <a class="qr-download" href="${qrDownloadHref(link)}" download="${event.batchId}-qr.svg">${t("downloadQr")}</a>
+      <button class="qr-download" type="button" data-batch-id="${event.batchId}" data-batch-link="${link}">${t("saveQrPdf")}</button>
     `;
-    node.querySelector("h3").textContent = `${event.actionType.replaceAll("_", " ")} - ${event.status}`;
+    node.querySelector("h3").textContent = `${actionLabel(event.actionType)} - ${statusLabel(event.status)}`;
     node.querySelector("p").textContent = `${event.senderName} - ${event.locationText}. ${event.note || ""}`.trim();
     const proof = node.querySelector("small");
     if (event.txHash) {
@@ -402,6 +476,12 @@ function hydrateBatchFromUrl() {
 
 document.querySelectorAll("[data-screen-target]").forEach((button) => {
   button.addEventListener("click", () => showScreen(button.dataset.screenTarget));
+});
+
+$("timeline").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-batch-id][data-batch-link]");
+  if (!button) return;
+  printQrPdf(button.dataset.batchId, button.dataset.batchLink);
 });
 
 $("batchForm").addEventListener("submit", (event) => {

@@ -275,8 +275,15 @@ button {
 
 .qr-download {
   margin-top: 8px;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
   font-size: 0.68rem;
   line-height: 1.2;
+  text-decoration: underline;
 }
 
 .timeline-item h3 {
