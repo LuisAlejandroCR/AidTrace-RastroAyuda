@@ -17,9 +17,10 @@ const CELOSCAN_TX_BASE =
   process.env.CELOSCAN_TX_BASE ||
   "https://celoscan.io/tx";
 
-// Use a recent block to avoid scanning the full Celo chain.
-// Adjust later if needed.
-const FROM_BLOCK = BigInt(process.env.AIDTRACE_FROM_BLOCK || "70700000");
+const DEPLOYMENT_TX_HASH =
+  process.env.AIDTRACE_DEPLOYMENT_TX_HASH ||
+  "0xffff51135fb18030c1cc3f9fbfddfdbb1b0540c77c6824b9a9c1f7d163e908c2";
+const LOG_BLOCK_STEP = 4_900n;
 
 const aidTraceEvent = parseAbiItem(
   "event AidTraceEvent(bytes32 indexed batchId, bytes32 indexed actionType, address indexed sender, bytes32 dataHash, string referenceURI, uint16 schemaVersion, uint16 flags)"
@@ -53,6 +54,36 @@ function parseReferenceURI(referenceURI) {
   };
 }
 
+async function timelineFromBlock() {
+  if (process.env.AIDTRACE_FROM_BLOCK) {
+    return BigInt(process.env.AIDTRACE_FROM_BLOCK);
+  }
+
+  const receipt = await publicClient.getTransactionReceipt({
+    hash: DEPLOYMENT_TX_HASH,
+  });
+
+  return receipt.blockNumber;
+}
+
+async function getAidTraceLogs(fromBlock) {
+  const latestBlock = await publicClient.getBlockNumber();
+  const logs = [];
+
+  for (let start = fromBlock; start <= latestBlock; start += LOG_BLOCK_STEP + 1n) {
+    const end = start + LOG_BLOCK_STEP > latestBlock ? latestBlock : start + LOG_BLOCK_STEP;
+    const chunk = await publicClient.getLogs({
+      address: CONTRACT_ADDRESS,
+      event: aidTraceEvent,
+      fromBlock: start,
+      toBlock: end,
+    });
+    logs.push(...chunk);
+  }
+
+  return logs;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -68,13 +99,8 @@ export default async function handler(req, res) {
 
   try {
     const limit = Math.min(Number(req.query.limit || 50), 100);
-
-    const logs = await publicClient.getLogs({
-      address: CONTRACT_ADDRESS,
-      event: aidTraceEvent,
-      fromBlock: FROM_BLOCK,
-      toBlock: "latest",
-    });
+    const fromBlock = await timelineFromBlock();
+    const logs = await getAidTraceLogs(fromBlock);
 
     const latestLogs = logs.slice(-limit).reverse();
 

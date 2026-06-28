@@ -3,6 +3,7 @@ const USDC_TOKEN_ADDRESS = "0xcebA9300f2b948710d2653dD7B07f33A8B32118C";
 const USDC_FEE_CURRENCY = "0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B";
 const CONTRACT_ADDRESS = "0xaf5c40e82ac9255479a1f447e81992b71c4f4934";
 const RELAY_ENDPOINT = "https://aidtrace-rastroayuda.vercel.app/api/zavu";
+const TIMELINE_ENDPOINT = "https://aidtrace-rastroayuda.vercel.app/api/timeline";
 const STORE_KEY = "aidtrace_state_v4";
 
 const NETWORK = {
@@ -59,15 +60,19 @@ const translations = {
     delivered: "Delivered",
     damaged: "Damaged",
     needsReview: "Needs review",
-    smsConfirmed: "SMS confirmed",
+    smsConfirmed: "Verified",
     empty: "Create a QR or save a label. It will stay available offline and sync when Celo is reachable.",
     savedLocal: "Saved locally. AidTrace will sync automatically when internet is available.",
     offlineSaved: "You're offline, no worries. This process was stored locally and will sync automatically once you are online.",
     onlineSyncing: "You're online. We're syncing pending proofs now.",
     syncDone: "Sync complete. Pending proofs were saved on Celo.",
     syncPartial: "Some proofs were saved on Celo. The pending ones will retry automatically.",
-    syncNeedsRelay: "Saved locally. AidTrace will sync automatically when the relayer is configured.",
+    syncNeedsRelay: "Saved locally. AidTrace will sync automatically when the Celo saver is configured.",
     syncFailed: "AidTrace could not save these proofs on Celo yet. It will retry automatically.",
+    timelineLoaded: "Timeline updated from Celo.",
+    timelineLoadFailed: "Local proofs are visible. Celo timeline will retry automatically.",
+    networkReady: "Celo Mainnet ready",
+    offlineReady: "Offline ready",
     saveQrPdf: "Click here to save the QR as PDF",
     txLink: "View Celo transaction",
     localProof: "Saved locally",
@@ -81,7 +86,7 @@ const translations = {
     actionDelivered: "Delivered",
     actionDamaged: "Damaged",
     actionNeedsReview: "Needs review",
-    actionSmsConfirmed: "SMS confirmed",
+    actionSmsConfirmed: "Verified",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -128,15 +133,19 @@ const translations = {
     delivered: "Entregado",
     damaged: "Danado",
     needsReview: "Requiere revision",
-    smsConfirmed: "Confirmado por SMS",
+    smsConfirmed: "Verificado",
     empty: "Crea un QR o guarda una etiqueta. Quedara disponible offline y se sincronizara cuando Celo este disponible.",
     savedLocal: "Guardado localmente. AidTrace sincronizara automaticamente cuando haya internet.",
     offlineSaved: "Estas offline, no te preocupes. El proceso se guardo localmente y se sincronizara automaticamente cuando estes online.",
     onlineSyncing: "Estas online. Estamos sincronizando las pruebas pendientes.",
     syncDone: "Sincronizacion completa. Las pruebas pendientes fueron guardadas en Celo.",
     syncPartial: "Algunas pruebas fueron guardadas en Celo. Las pendientes se reintentaran automaticamente.",
-    syncNeedsRelay: "Guardado localmente. AidTrace sincronizara automaticamente cuando el relayer este configurado.",
+    syncNeedsRelay: "Guardado localmente. AidTrace sincronizara automaticamente cuando el guardador de Celo este configurado.",
     syncFailed: "AidTrace aun no pudo guardar estas pruebas en Celo. Se reintentara automaticamente.",
+    timelineLoaded: "Historial actualizado desde Celo.",
+    timelineLoadFailed: "Las pruebas locales estan visibles. El historial de Celo se reintentara automaticamente.",
+    networkReady: "Celo Mainnet listo",
+    offlineReady: "Listo sin internet",
     saveQrPdf: "Haz clic aqui para guardar el QR como PDF",
     txLink: "Ver transaccion en Celo",
     localProof: "Guardado localmente",
@@ -150,30 +159,9 @@ const translations = {
     actionDelivered: "Entregado",
     actionDamaged: "Danado",
     actionNeedsReview: "Requiere revision",
-    actionSmsConfirmed: "Confirmado por SMS",
+    actionSmsConfirmed: "Verificado",
   },
 };
-
-const CHAIN_TIMELINE_ENDPOINT = "/api/timeline";
-let chainEvents = [];
-
-async function loadChainTimeline() {
-  if (!navigator.onLine) return;
-
-  try {
-    const response = await fetch(CHAIN_TIMELINE_ENDPOINT);
-
-    if (!response.ok) {
-      throw new Error(`Timeline failed: ${response.status}`);
-    }
-
-    const result = await response.json();
-    chainEvents = result.events || [];
-    render();
-  } catch (error) {
-    console.warn("Could not load Celo timeline:", error);
-  }
-}
 
 const defaultState = {
   language: "en",
@@ -244,24 +232,37 @@ function batchLink(batchId) {
   return url.toString();
 }
 
+function eventQrLink(event) {
+  if (event.qrLink) return event.qrLink;
+  const url = new URL(batchLink(event.batchId));
+  if (event.txHash) url.searchParams.set("tx", event.txHash);
+  return url.toString();
+}
+
+function supplyLabel(value) {
+  return {
+    water: t("water"),
+    food: t("food"),
+    medicine: t("medicine"),
+    shelter: t("shelter"),
+    tools: t("tools"),
+    other: t("other"),
+  }[value] || value;
+}
+
 function actionLabel(actionType) {
   const labels = {
     CREATED: t("actionCreated"),
-
     PICKUP: t("actionPickedUp"),
     PICKED_UP: t("actionPickedUp"),
-
+    ARRIVED: t("actionArrived"),
     DELIVER: t("actionDelivered"),
     DELIVERED: t("actionDelivered"),
-
+    DAMAGED: t("actionDamaged"),
     REVIEW: t("actionNeedsReview"),
     NEEDS_REVIEW: t("actionNeedsReview"),
-
-    ARRIVED: t("actionArrived"),
-    DAMAGED: t("actionDamaged"),
     SMS_CONFIRMED: t("actionSmsConfirmed"),
   };
-
   return labels[actionType] || String(actionType || "").replaceAll("_", " ");
 }
 
@@ -269,6 +270,76 @@ function statusLabel(status) {
   if (status === "sent_to_relayer") return t("statusSynced");
   if (status === "pending") return t("statusPending");
   return String(status || "");
+}
+
+function eventDescription(event) {
+  if (event.source === "celo" && event.note) return event.note;
+  return [event.senderName, event.locationText]
+    .filter(Boolean)
+    .join(" - ")
+    .concat(event.note ? `. ${event.note}` : "")
+    .trim();
+}
+
+function eventTimestamp(event) {
+  return event.blockTimestamp || event.syncedAt || event.createdAt || new Date().toISOString();
+}
+
+function mergeEvents(incomingEvents) {
+  const currentById = new Map(state.events.map((event) => [event.id, event]));
+  const idByTxHash = new Map(
+    state.events
+      .filter((event) => event.txHash)
+      .map((event) => [String(event.txHash).toLowerCase(), event.id]),
+  );
+
+  for (const event of incomingEvents) {
+    const existingId = event.txHash ? idByTxHash.get(String(event.txHash).toLowerCase()) : null;
+    if (existingId && existingId !== event.id) {
+      currentById.delete(existingId);
+    }
+
+    currentById.set(event.id, {
+      ...currentById.get(event.id),
+      ...event,
+      status: "sent_to_relayer",
+      source: "celo",
+    });
+  }
+
+  state.events = Array.from(currentById.values()).sort(
+    (a, b) => new Date(eventTimestamp(b)).getTime() - new Date(eventTimestamp(a)).getTime(),
+  );
+}
+
+async function loadOnchainTimeline({ silent = true } = {}) {
+  if (!navigator.onLine || !TIMELINE_ENDPOINT) return;
+  try {
+    const response = await fetch(`${TIMELINE_ENDPOINT}?limit=75`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`Timeline failed: ${response.status}`);
+    const payload = await response.json();
+    const events = (payload.events || []).map((event) => ({
+      id: event.id,
+      batchId: event.batchId,
+      actionType: event.actionType,
+      senderName: "",
+      locationText: "",
+      note: event.details || event.referenceURI || "",
+      dataHash: event.dataHash,
+      status: "sent_to_relayer",
+      txHash: event.txHash,
+      qrLink: event.qrLink || event.txUrl,
+      syncedAt: event.blockTimestamp,
+      createdAt: event.blockTimestamp,
+    }));
+    mergeEvents(events);
+    saveState();
+    if (!silent && events.length) notify(t("timelineLoaded"));
+  } catch {
+    if (!silent) notify(t("timelineLoadFailed"));
+  }
 }
 
 function printQrPdf(batchId, link) {
@@ -332,7 +403,7 @@ async function createBatch(form) {
     actionType: "CREATED",
     senderName: "AidTrace Admin",
     locationText: batch.origin,
-    note: `${batch.quantity} ${batch.supplyType} to ${batch.destination}. ${batch.notes}`.trim(),
+    note: `${batch.quantity} ${supplyLabel(batch.supplyType)} ${state.language === "es" ? "a" : "to"} ${batch.destination}. ${batch.notes}`.trim(),
     ref: `aidtrace://${batchId}`,
   });
   form.reset();
@@ -461,40 +532,28 @@ function applyLanguage() {
 function render() {
   applyLanguage();
   const pendingCount = state.events.filter((event) => event.status === "pending").length;
-  $("networkState").textContent = navigator.onLine ? `${NETWORK.name} ready` : "Offline ready";
+  $("networkState").textContent = navigator.onLine ? t("networkReady") : t("offlineReady");
   $("queueState").textContent = `${pendingCount} ${t("pendingProofs")} - ${NETWORK.name}`;
 
   const timeline = $("timeline");
   timeline.textContent = "";
-
-  const localPendingEvents = state.events.filter((event) => event.status === "pending");
-
-  const timelineEvents = [...chainEvents, ...localPendingEvents].sort((a, b) => {
-    const dateA = Date.parse(a.blockTimestamp || a.createdAt || 0);
-    const dateB = Date.parse(b.blockTimestamp || b.createdAt || 0);
-    return dateB - dateA;
-  });
-
-  if (!timelineEvents.length) {
+  if (!state.events.length) {
     timeline.innerHTML = `<p class="hint">${t("empty")}</p>`;
     return;
   }
 
   const template = $("itemTemplate");
-  for (const event of timelineEvents) {  
+  for (const event of state.events) {
     const node = template.content.cloneNode(true);
     const tag = node.querySelector(".tag");
-    const txUrl = event.txUrl || (event.txHash ? `${NETWORK.txExplorer}/${event.txHash}` : "");
-    const link = txUrl || batchLink(event.batchId);    
+    const link = eventQrLink(event);
     tag.innerHTML = `
       ${qrSvg(link)}
       <span>${event.batchId}</span>
       <button class="qr-download" type="button" data-batch-id="${event.batchId}" data-batch-link="${link}">${t("saveQrPdf")}</button>
     `;
     node.querySelector("h3").textContent = `${actionLabel(event.actionType)} - ${statusLabel(event.status)}`;
-    node.querySelector("p").textContent = event.details
-  ? event.details
-  : `${event.senderName || ""} - ${event.locationText || ""}. ${event.note || ""}`.trim();    
+    node.querySelector("p").textContent = eventDescription(event);
     const proof = node.querySelector("small");
     if (event.txHash) {
       proof.innerHTML = `${t("relayerPacketSent")} - <a href="${NETWORK.txExplorer}/${event.txHash}" target="_blank" rel="noreferrer">${t("txLink")}</a>`;
@@ -540,10 +599,20 @@ $("languageToggle").addEventListener("click", () => {
   saveState();
 });
 
+window.addEventListener("online", () => {
+  render();
+  loadOnchainTimeline({ silent: true });
+  if (state.events.some((event) => event.status === "pending")) {
+    notify(t("onlineSyncing"));
+    autoSyncPending();
+  }
+});
 window.addEventListener("offline", () => {
   render();
   notify(t("offlineSaved"));
 });
+window.addEventListener("focus", () => loadOnchainTimeline({ silent: true }));
+window.addEventListener("pageshow", () => loadOnchainTimeline({ silent: true }));
 window.addEventListener("pagehide", sendPendingBeforeLeave);
 
 if ("serviceWorker" in navigator) {
@@ -552,18 +621,4 @@ if ("serviceWorker" in navigator) {
 
 render();
 hydrateBatchFromUrl();
-
-loadChainTimeline();
-
-window.addEventListener("focus", loadChainTimeline);
-window.addEventListener("pageshow", loadChainTimeline);
-
-window.addEventListener("online", () => {
-  render();
-  loadChainTimeline();
-
-  if (state.events.some((event) => event.status === "pending")) {
-    notify(t("onlineSyncing"));
-    autoSyncPending();
-  }
-});
+loadOnchainTimeline({ silent: true });

@@ -311,7 +311,7 @@ Pause SMS tests for the hackathon. International SMS is not required for the liv
 
 ## Block 9: Zavu Message Contract
 
-Inbound Telegram should be text-only and natural. Future SMS/WhatsApp adapters should use the same grammar. Print the short key on the QR label and let operators write quantity in the details:
+Inbound Telegram should be text-only and natural. Future Voice-notes, SMS/WhatsApp adapters should use the same grammar. Print the short key on the QR label and let operators write quantity in the details:
 
 ```text
 CELO7 depositar 100 aguas refugio mayor
