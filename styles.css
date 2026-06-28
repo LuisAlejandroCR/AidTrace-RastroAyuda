@@ -226,6 +226,12 @@ button {
   width: 100%;
 }
 
+.compact {
+  min-height: 36px;
+  padding: 7px 12px;
+  font-size: 0.78rem;
+}
+
 .button-stack {
   display: flex;
   gap: 8px;
@@ -236,6 +242,32 @@ button {
 .timeline {
   display: grid;
   gap: 12px;
+}
+
+.timeline-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.timeline-controls[hidden] {
+  display: none;
+}
+
+.timeline-controls.bottom {
+  margin: 14px 0 0;
+}
+
+.timeline-controls div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .timeline-item {
@@ -432,6 +464,16 @@ dd {
   }
 
   .button-stack button {
+    width: 100%;
+  }
+
+  .timeline-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .timeline-controls div,
+  .timeline-controls button {
     width: 100%;
   }
 }

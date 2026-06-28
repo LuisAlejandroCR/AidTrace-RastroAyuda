@@ -7,6 +7,9 @@ const RELAY_ENDPOINT = `${APP_ORIGIN}/api/zavu`;
 const TIMELINE_ENDPOINT = `${APP_ORIGIN}/api/timeline`;
 const STORE_KEY = "aidtrace_state_v4";
 const ONLINE_RELOAD_KEY = "aidtrace_reloaded_after_online";
+const TIMELINE_FETCH_LIMIT = 30;
+const TIMELINE_FETCH_ALL_LIMIT = 100;
+const TIMELINE_PAGE_SIZE = 10;
 
 const NETWORK = {
   name: "Celo Mainnet",
@@ -82,6 +85,11 @@ const translations = {
     pendingProofs: "pending",
     statusPending: "pending",
     statusSynced: "saved on Celo",
+    timelineShowing: "Showing",
+    timelineOf: "of",
+    showMore: "Show more",
+    seeAll: "See all",
+    showLess: "Show less",
     actionCreated: "Created",
     actionPickedUp: "Picked up",
     actionArrived: "Arrived",
@@ -155,6 +163,11 @@ const translations = {
     pendingProofs: "pendiente",
     statusPending: "pendiente",
     statusSynced: "guardado en Celo",
+    timelineShowing: "Mostrando",
+    timelineOf: "de",
+    showMore: "Ver mas",
+    seeAll: "Ver todo",
+    showLess: "Ver menos",
     actionCreated: "Creado",
     actionPickedUp: "Recogido",
     actionArrived: "Llego",
@@ -172,6 +185,8 @@ const defaultState = {
 };
 
 let state = loadState();
+let timelineVisibleCount = TIMELINE_PAGE_SIZE;
+let timelineShowAll = false;
 const $ = (id) => document.getElementById(id);
 
 function t(key) {
@@ -314,10 +329,10 @@ function mergeEvents(incomingEvents) {
   );
 }
 
-async function loadOnchainTimeline({ silent = true } = {}) {
+async function loadOnchainTimeline({ silent = true, limit = TIMELINE_FETCH_LIMIT } = {}) {
   if (!navigator.onLine || !TIMELINE_ENDPOINT) return;
   try {
-    const response = await fetch(`${TIMELINE_ENDPOINT}?limit=75`, {
+    const response = await fetch(`${TIMELINE_ENDPOINT}?limit=${limit}`, {
       headers: { Accept: "application/json" },
     });
     if (!response.ok) throw new Error(`Timeline failed: ${response.status}`);
@@ -544,14 +559,30 @@ function render() {
   $("queueState").textContent = `${pendingCount} ${t("pendingProofs")} - ${NETWORK.name}`;
 
   const timeline = $("timeline");
+  const timelineControls = document.querySelectorAll("[data-timeline-controls]");
   timeline.textContent = "";
   if (!state.events.length) {
     timeline.innerHTML = `<p class="hint">${t("empty")}</p>`;
+    timelineControls.forEach((controls) => controls.setAttribute("hidden", ""));
     return;
   }
 
+  const visibleEvents = timelineShowAll
+    ? state.events
+    : state.events.slice(0, timelineVisibleCount);
+  const hasMore = visibleEvents.length < state.events.length;
+
+  timelineControls.forEach((controls) => {
+    controls.removeAttribute("hidden");
+    controls.querySelector("[data-timeline-count]").textContent =
+      `${t("timelineShowing")} ${visibleEvents.length} ${t("timelineOf")} ${state.events.length}`;
+    controls.querySelector("[data-timeline-more]").hidden = !hasMore;
+    controls.querySelector("[data-timeline-all]").hidden = timelineShowAll || !hasMore;
+    controls.querySelector("[data-timeline-less]").hidden = !timelineShowAll && timelineVisibleCount <= TIMELINE_PAGE_SIZE;
+  });
+
   const template = $("itemTemplate");
-  for (const event of state.events) {
+  for (const event of visibleEvents) {
     const node = template.content.cloneNode(true);
     const tag = node.querySelector(".tag");
     const link = eventQrLink(event);
@@ -584,6 +615,31 @@ function hydrateBatchFromUrl() {
 
 document.querySelectorAll("[data-screen-target]").forEach((button) => {
   button.addEventListener("click", () => showScreen(button.dataset.screenTarget));
+});
+
+document.querySelectorAll("[data-timeline-more]").forEach((button) => {
+  button.addEventListener("click", () => {
+    timelineVisibleCount += TIMELINE_PAGE_SIZE;
+    timelineShowAll = false;
+    render();
+  });
+});
+
+document.querySelectorAll("[data-timeline-all]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    timelineShowAll = true;
+    await loadOnchainTimeline({ silent: true, limit: TIMELINE_FETCH_ALL_LIMIT });
+    render();
+  });
+});
+
+document.querySelectorAll("[data-timeline-less]").forEach((button) => {
+  button.addEventListener("click", () => {
+    timelineVisibleCount = TIMELINE_PAGE_SIZE;
+    timelineShowAll = false;
+    render();
+    $("screen-timeline").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
 });
 
 $("timeline").addEventListener("click", (event) => {

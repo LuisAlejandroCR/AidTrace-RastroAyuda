@@ -112,7 +112,23 @@
             <p id="queueState">0 pending</p>
           </div>
         </div>
+        <div class="timeline-controls" data-timeline-controls hidden>
+          <span data-timeline-count></span>
+          <div>
+            <button class="secondary compact" type="button" data-timeline-more data-i18n="showMore">Show more</button>
+            <button class="secondary compact" type="button" data-timeline-all data-i18n="seeAll">See all</button>
+            <button class="ghost compact" type="button" data-timeline-less data-i18n="showLess">Show less</button>
+          </div>
+        </div>
         <div id="timeline" class="timeline" aria-live="polite"></div>
+        <div class="timeline-controls bottom" data-timeline-controls hidden>
+          <span data-timeline-count></span>
+          <div>
+            <button class="secondary compact" type="button" data-timeline-more data-i18n="showMore">Show more</button>
+            <button class="secondary compact" type="button" data-timeline-all data-i18n="seeAll">See all</button>
+            <button class="ghost compact" type="button" data-timeline-less data-i18n="showLess">Show less</button>
+          </div>
+        </div>
       </section>
 
       <p id="networkState" class="visually-hidden">Offline ready</p>
