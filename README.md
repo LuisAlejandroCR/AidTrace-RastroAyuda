@@ -414,9 +414,13 @@ $$;
 
 grant execute on function public.try_acquire_aidtrace_lock(text, text, integer) to anon, authenticated, service_role;
 grant execute on function public.release_aidtrace_lock(text, text) to anon, authenticated, service_role;
+
+notify pgrst, 'reload schema';
 ```
 
 If Vercel logs show `new row violates row-level security policy`, the direct-table lock path is being blocked. Use the RPC functions above and redeploy with the latest `api/zavu.mjs`.
+
+If Vercel logs show `Could not find the function public.try_acquire_aidtrace_lock(...) in the schema cache`, run the SQL block again and keep the final `notify pgrst, 'reload schema';` line. Supabase can take a moment to expose new RPC functions through PostgREST.
 
 Use the server-only service role key from Supabase. Do not expose it in browser code.
 

@@ -187,6 +187,7 @@ const defaultState = {
 let state = loadState();
 let timelineVisibleCount = TIMELINE_PAGE_SIZE;
 let timelineShowAll = false;
+const qrPrintLinks = new Map();
 const $ = (id) => document.getElementById(id);
 
 function t(key) {
@@ -217,6 +218,16 @@ function notify(message) {
 function short(value) {
   if (!value) return "";
   return value.length > 18 ? `${value.slice(0, 10)}...${value.slice(-6)}` : value;
+}
+
+function escapeHtml(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[char]));
 }
 
 function makeBatchCode() {
@@ -362,11 +373,14 @@ async function loadOnchainTimeline({ silent = true, limit = TIMELINE_FETCH_LIMIT
 function printQrPdf(batchId, link) {
   const win = window.open("", "_blank", "noopener,noreferrer");
   if (!win) return;
+  const safeTitle = escapeHtml(`${batchId} QR`);
+  const safeBatchId = escapeHtml(batchId);
+  const safeLink = escapeHtml(link);
   win.document.write(`<!doctype html>
     <html>
       <head>
         <meta charset="utf-8" />
-        <title>${batchId} QR</title>
+        <title>${safeTitle}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
           .label { width: 320px; border: 1px solid #111; padding: 18px; text-align: center; }
@@ -379,8 +393,8 @@ function printQrPdf(batchId, link) {
         <div class="label">
           <h1>AidTrace</h1>
           ${qrSvg(link)}
-          <h2>${batchId}</h2>
-          <p>${link}</p>
+          <h2>${safeBatchId}</h2>
+          <p>${safeLink}</p>
         </div>
         <script>window.onload = () => { window.print(); };</script>
       </body>
@@ -554,6 +568,7 @@ function applyLanguage() {
 
 function render() {
   applyLanguage();
+  qrPrintLinks.clear();
   const pendingCount = state.events.filter((event) => event.status === "pending").length;
   $("networkState").textContent = navigator.onLine ? t("networkReady") : t("offlineReady");
   $("queueState").textContent = `${pendingCount} ${t("pendingProofs")} - ${NETWORK.name}`;
@@ -586,10 +601,12 @@ function render() {
     const node = template.content.cloneNode(true);
     const tag = node.querySelector(".tag");
     const link = eventQrLink(event);
+    const printId = event.id || crypto.randomUUID();
+    qrPrintLinks.set(printId, { batchId: event.batchId, link });
     tag.innerHTML = `
       ${qrSvg(link)}
       <span>${event.batchId}</span>
-      <button class="qr-download" type="button" data-batch-id="${event.batchId}" data-batch-link="${link}">${t("saveQrPdf")}</button>
+      <button class="qr-download" type="button" data-qr-print-id="${printId}">${t("saveQrPdf")}</button>
     `;
     node.querySelector("h3").textContent = `${actionLabel(event.actionType)} - ${statusLabel(event.status)}`;
     node.querySelector("p").textContent = eventDescription(event);
@@ -643,9 +660,11 @@ document.querySelectorAll("[data-timeline-less]").forEach((button) => {
 });
 
 $("timeline").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-batch-id][data-batch-link]");
+  const button = event.target.closest("[data-qr-print-id]");
   if (!button) return;
-  printQrPdf(button.dataset.batchId, button.dataset.batchLink);
+  const printData = qrPrintLinks.get(button.dataset.qrPrintId);
+  if (!printData) return;
+  printQrPdf(printData.batchId, printData.link);
 });
 
 $("batchForm").addEventListener("submit", (event) => {
