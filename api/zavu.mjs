@@ -5,9 +5,8 @@ import {
   createWalletClient,
   http,
   keccak256,
-  pad,
+  stringToHex,
   stringToBytes,
-  toBytes,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { celo } from "viem/chains";
@@ -38,7 +37,7 @@ const zavu = new Zavudev({
 });
 
 function bytes32Text(value) {
-  return pad(toBytes(String(value).toUpperCase().slice(0, 31)), { size: 32 });
+  return stringToHex(String(value).toUpperCase().slice(0, 31), { size: 32 });
 }
 
 function parseAidTraceText(text) {
