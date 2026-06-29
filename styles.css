@@ -137,17 +137,19 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 190px;
+  width: 220px;
   min-height: 56px;
-  padding: 14px 24px;
+  padding: 14px 22px;
   border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--ink);
+  border: 1.5px solid #3f7763;
+  background: rgba(247, 251, 248, 0.9);
+  color: #2f6f5a;
   font-size: 1rem;
   font-weight: 900;
   line-height: 1.2;
-  box-shadow: var(--shadow);
+  cursor: pointer;
+  box-shadow: 0 12px 30px rgba(31, 65, 52, 0.08);
+  flex: 0 0 auto;
 }
 
 .language-button:hover {
@@ -155,7 +157,7 @@ h2 {
 }
 
 .language-button:focus-visible {
-  outline: 3px solid rgba(66, 111, 97, 0.35);
+  outline: 3px solid rgba(63, 119, 99, 0.3);
   outline-offset: 4px;
 }
 
@@ -538,10 +540,13 @@ dd {
     font-size: 0.78rem;
   }
 
-  .language-button {
-  min-width: 170px;
-  min-height: 54px;
-  font-size: 0.95rem;
+  @media (max-width: 640px) {
+    .language-button {
+      width: 190px;
+      min-height: 52px;
+      font-size: 0.92rem;
+      padding: 12px 18px;
+    }
   }
 
   .form-grid,

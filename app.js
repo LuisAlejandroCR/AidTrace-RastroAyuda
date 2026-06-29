@@ -592,20 +592,20 @@ function applyLanguage() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   });
+
   const languageToggle = $("languageToggle");
 
   if (languageToggle) {
     const label =
       state.language === "es"
-        ? "🌐 Cambiar a inglés"
-        : "🌐 Change to Spanish";
+        ? "Cambiar a inglés"
+        : "Change to Spanish";
 
     languageToggle.textContent = label;
     languageToggle.setAttribute("aria-label", label);
     languageToggle.setAttribute("title", label);
   }
 }
-
 function render() {
   applyLanguage();
   qrPrintLinks.clear();
