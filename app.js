@@ -23,7 +23,6 @@ const translations = {
   en: {
     eyebrow: "Offline aid tracking on Celo",
     subhead: "RastroAyuda: calm, verifiable custody for humanitarian supplies.",
-    languageHint: "Clic para cambiar de lenguaje",
     navCreate: "Create",
     navUpdate: "Update",
     navTimeline: "Timeline",
@@ -104,7 +103,6 @@ const translations = {
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
     subhead: "RastroAyuda: custodia tranquila y verificable para insumos humanitarios.",
-    languageHint: "Click to change language",
     navCreate: "Crear",
     navUpdate: "Actualizar",
     navTimeline: "Historial",
@@ -185,7 +183,7 @@ const translations = {
 };
 
 const defaultState = {
-  language: "en",
+  language: "es",
   batches: [],
   events: [],
 };
@@ -594,7 +592,18 @@ function applyLanguage() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   });
-  $("languageToggle").querySelector("strong").textContent = state.language === "en" ? "ES" : "EN";
+  const languageToggle = $("languageToggle");
+
+  if (languageToggle) {
+    const label =
+      state.language === "es"
+        ? "🌐 Cambiar a inglés"
+        : "🌐 Change to Spanish";
+
+    languageToggle.textContent = label;
+    languageToggle.setAttribute("aria-label", label);
+    languageToggle.setAttribute("title", label);
+  }
 }
 
 function render() {

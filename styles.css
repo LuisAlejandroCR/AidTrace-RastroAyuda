@@ -134,27 +134,29 @@ h2 {
 }
 
 .language-button {
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-  min-width: 142px;
-  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 190px;
+  min-height: 56px;
+  padding: 14px 24px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--ink);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
   box-shadow: var(--shadow);
 }
 
-.language-button strong {
-  font-size: 0.95rem;
+.language-button:hover {
+  background: #ffffff;
 }
 
-.language-button span {
-  color: var(--muted);
-  font-size: 0.65rem;
-  font-weight: 800;
-  line-height: 1.1;
+.language-button:focus-visible {
+  outline: 3px solid rgba(66, 111, 97, 0.35);
+  outline-offset: 4px;
 }
 
 .tabbar {
@@ -537,7 +539,9 @@ dd {
   }
 
   .language-button {
-    min-width: 118px;
+  min-width: 170px;
+  min-height: 54px;
+  font-size: 0.95rem;
   }
 
   .form-grid,
