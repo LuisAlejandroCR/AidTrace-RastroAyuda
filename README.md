@@ -213,6 +213,28 @@ Only enable `AIDTRACE_QUEUE_ENABLED=true` after `supabase/aidtrace_queue.sql` ha
 
 The protected worker endpoint is `POST /api/process-queue` with `X-AidTrace-Worker-Token: <token>` or `Authorization: Bearer <token>`.
 
+Automatic queue worker:
+
+```text
+.github/workflows/process-queue.yml
+```
+
+GitHub Actions calls `/api/process-queue?limit=3` every 5 minutes and can also be run manually from the Actions tab.
+
+Required GitHub repository secret:
+
+```text
+AIDTRACE_QUEUE_WORKER_TOKEN=<same value used in Vercel>
+```
+
+Optional GitHub repository variable:
+
+```text
+AIDTRACE_APP_URL=https://aidtrace-rastroayuda.vercel.app
+```
+
+GitHub scheduled workflows run from the default branch and may start a few minutes late. For a live demo, the manual worker command below is still useful as a backup.
+
 Manual worker smoke test:
 
 ```powershell

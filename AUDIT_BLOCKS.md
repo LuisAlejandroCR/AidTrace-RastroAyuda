@@ -432,12 +432,13 @@ Action: confirm functions are available through PostgREST after notify pgrst rel
 Acceptance: enqueue_aidtrace_message returns the same queue row for duplicate inbound_message_id.
 
 P0-03 - Queue-backed Celo worker
-Status: deployed burst test passed for three queued Celo writes.
+Status: deployed burst test passed for three queued Celo writes; GitHub cron worker added.
 Why: writes must be serialized across Vercel instances and survive function exit.
-Files: api/zavu.mjs, api/process-queue.mjs, vercel.json if using cron.
+Files: api/zavu.mjs, api/process-queue.mjs, .github/workflows/process-queue.yml.
 Action: run supabase/aidtrace_queue.sql.
 Action: set AIDTRACE_QUEUE_ENABLED=true only after SQL is live.
 Action: set AIDTRACE_QUEUE_WORKER_TOKEN and call POST /api/process-queue?limit=3 with that token.
+Action: add GitHub secret AIDTRACE_QUEUE_WORKER_TOKEN and let .github/workflows/process-queue.yml call the worker every 5 minutes.
 Action: leave AIDTRACE_BROWSER_QUEUE_ENABLED unset for the demo; browser proofs should keep returning tx hashes directly.
 Action: keep current Supabase/Redis lock around the actual Celo write.
 Acceptance: PASSED - three quick Telegram messages produced three sequential Celo tx hashes without replacement transaction underpriced errors.
