@@ -144,10 +144,11 @@ sw.js                       Service worker cache and background sync handoff
 qrcode.js                   Local QR generator
 api/zavu.mjs                Browser relay endpoint and Zavu Telegram webhook
 api/process-queue.mjs       Protected queue worker that processes one Supabase queued Celo write per call
-api/timeline.mjs            Celo log reader for timeline hydration
+api/timeline.mjs            Celo timeline reader with Supabase index fallback
 AidTraceLedger.sol          On-chain proof ledger
 scripts/send-zavu-message.mjs Outbound channel smoke test
 supabase/aidtrace_queue.sql Supabase durable queue table and RPCs for serialized Celo writes
+supabase/aidtrace_timeline.sql Supabase indexed timeline cache for bounded reads
 ```
 
 Security/readiness audit:
@@ -175,6 +176,14 @@ RASTROAYUDA_ZAVU_API_KEY=<zv_live_...>
 SUPABASE_URL=<project url>
 SUPABASE_SERVICE_ROLE_KEY=<service role key>
 ```
+
+Optional timeline index env:
+
+```text
+AIDTRACE_TIMELINE_INDEX_ENABLED=true
+```
+
+Timeline indexing is enabled automatically when Supabase service envs exist. Set `AIDTRACE_TIMELINE_INDEX_ENABLED=false` only if you need to fall back to direct Celo log scans.
 
 Optional durable queue envs:
 
@@ -211,6 +220,7 @@ Supabase queue setup:
 
 ```text
 Run supabase/aidtrace_queue.sql in the Supabase SQL editor before wiring queue-backed processing.
+Run supabase/aidtrace_timeline.sql in the Supabase SQL editor before using indexed timeline reads.
 ```
 
 Optional webhook hardening:
@@ -244,6 +254,7 @@ Use the existing contract for new flows. Avoid redeploying just to add labels, p
 7. Confirm the bot replies with a Celoscan transaction link.
 8. Open the transaction and inspect `referenceURI`.
 9. Confirm the event appears in the app timeline.
+10. Call `/api/timeline?limit=30` twice and confirm the second call returns from the indexed cache without a full historical scan.
 
 ## Notes
 
