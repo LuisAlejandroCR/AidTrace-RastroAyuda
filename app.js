@@ -9,7 +9,6 @@ const STORE_KEY = "aidtrace_state_v4";
 const ONLINE_RELOAD_KEY = "aidtrace_reloaded_after_online";
 const TIMELINE_FETCH_LIMIT = 100;
 const TIMELINE_PAGE_SIZE = 10;
-const TIMELINE_PAGE_BUTTONS = 10;
 
 const NETWORK = {
   name: "Celo Mainnet",
@@ -89,6 +88,8 @@ const translations = {
     statusSynced: "saved on Celo",
     timelineShowing: "Showing",
     timelineOf: "of",
+    pageLabel: "Page",
+    pageSelect: "Choose page",
     showMore: "Show more",
     seeAll: "See all",
     showLess: "Show less",
@@ -172,6 +173,8 @@ const translations = {
     statusSynced: "guardado en Celo",
     timelineShowing: "Mostrando",
     timelineOf: "de",
+    pageLabel: "Pagina",
+    pageSelect: "Elegir pagina",
     showMore: "Ver mas",
     seeAll: "Ver todo",
     showLess: "Ver menos",
@@ -668,8 +671,6 @@ function render() {
   const pageStart = (timelinePage - 1) * TIMELINE_PAGE_SIZE;
   const pageEnd = Math.min(pageStart + TIMELINE_PAGE_SIZE, state.events.length);
   const visibleEvents = state.events.slice(pageStart, pageEnd);
-  const pageWindowStart = Math.floor((timelinePage - 1) / TIMELINE_PAGE_BUTTONS) * TIMELINE_PAGE_BUTTONS + 1;
-  const pageWindowEnd = Math.min(totalPages, pageWindowStart + TIMELINE_PAGE_BUTTONS - 1);
 
   timelineControls.forEach((controls) => {
     controls.removeAttribute("hidden");
@@ -686,15 +687,23 @@ function render() {
     previous.dataset.timelinePage = String(timelinePage - 1);
     pages.appendChild(previous);
 
-    for (let page = pageWindowStart; page <= pageWindowEnd; page += 1) {
-      const button = document.createElement("button");
-      button.className = `secondary compact page-button${page === timelinePage ? " is-active" : ""}`;
-      button.type = "button";
-      button.textContent = String(page);
-      button.dataset.timelinePage = String(page);
-      button.setAttribute("aria-current", page === timelinePage ? "page" : "false");
-      pages.appendChild(button);
+    const pageStatus = document.createElement("span");
+    pageStatus.className = "pagination-status";
+    pageStatus.textContent = `${t("pageLabel")} ${timelinePage} ${t("timelineOf")} ${totalPages}`;
+    pages.appendChild(pageStatus);
+
+    const pageSelect = document.createElement("select");
+    pageSelect.className = "page-select";
+    pageSelect.dataset.timelineSelect = "true";
+    pageSelect.setAttribute("aria-label", t("pageSelect"));
+    for (let page = 1; page <= totalPages; page += 1) {
+      const option = document.createElement("option");
+      option.value = String(page);
+      option.textContent = `${t("pageLabel")} ${page}`;
+      option.selected = page === timelinePage;
+      pageSelect.appendChild(option);
     }
+    pages.appendChild(pageSelect);
 
     const next = document.createElement("button");
     next.className = "secondary compact page-button";
@@ -753,6 +762,14 @@ document.querySelectorAll("[data-timeline-controls]").forEach((controls) => {
     const button = event.target.closest("[data-timeline-page]");
     if (!button || button.disabled) return;
     timelinePage = Number(button.dataset.timelinePage);
+    render();
+    $("screen-timeline").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  controls.addEventListener("change", (event) => {
+    const select = event.target.closest("[data-timeline-select]");
+    if (!select) return;
+    timelinePage = Number(select.value);
     render();
     $("screen-timeline").scrollIntoView({ behavior: "smooth", block: "start" });
   });
