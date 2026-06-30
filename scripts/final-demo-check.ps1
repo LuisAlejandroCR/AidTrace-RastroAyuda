@@ -22,8 +22,9 @@ function Invoke-CurlProbe($Arguments) {
   $output = & curl.exe @Arguments 2>$null
   $text = ($output -join "`n")
   $status = 0
-  if ($text -match "HTTP/\S+\s+(\d{3})") {
-    $status = [int]$Matches[1]
+  $matches = [regex]::Matches($text, "HTTP/\S+\s+(\d{3})")
+  if ($matches.Count -gt 0) {
+    $status = [int]$matches[$matches.Count - 1].Groups[1].Value
   }
   return @{
     StatusCode = $status
@@ -78,6 +79,10 @@ $badRelay = Invoke-CurlProbe @(
   "-H", "Content-Type: application/json",
   "--data", $badRelayBody
 )
+if ($badRelay.StatusCode -ne 403) {
+  Write-Host "Bad-origin relay actual status: $($badRelay.StatusCode)" -ForegroundColor Yellow
+  Write-Host ($badRelay.Text.Substring(0, [Math]::Min(700, $badRelay.Text.Length))) -ForegroundColor DarkYellow
+}
 Assert-Ok ($badRelay.StatusCode -eq 403) "unknown Origin browser relay is rejected with 403"
 
 Write-Host ""

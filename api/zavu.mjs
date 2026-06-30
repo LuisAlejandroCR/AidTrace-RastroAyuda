@@ -715,15 +715,17 @@ export default async function handler(req, res) {
     return res.status(405).send("Method not allowed");
   }
 
+  const origin = requestOrigin(req);
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ ok: false, error: "Origin not allowed" });
+  }
+
   try {
     const event = req.body || {};
 
     console.log("Zavu event:", JSON.stringify(event, null, 2));
 
     if (event.schema === "aidtrace.relay.v1") {
-      if (!isAllowedOrigin(requestOrigin(req))) {
-        return res.status(403).json({ ok: false, error: "Origin not allowed" });
-      }
       return handleBrowserRelay(event, req, res);
     }
 

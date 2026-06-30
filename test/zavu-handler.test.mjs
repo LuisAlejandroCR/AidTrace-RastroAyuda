@@ -75,3 +75,26 @@ test("rejects browser relay packets from an unknown origin", async () => {
   assert.equal(res.statusCode, 403);
   assert.deepEqual(res.body, { ok: false, error: "Origin not allowed" });
 });
+
+test("rejects any unknown browser origin before body handling", async () => {
+  process.env.RASTROAYUDA_ZAVU_API_KEY = "zv_test_unit_1234567890";
+  const { default: handler } = await import("../api/zavu.mjs");
+  const req = {
+    method: "POST",
+    headers: {
+      origin: "https://evil.example",
+      "content-type": "application/json",
+    },
+    body: "not-json",
+    url: "/api/zavu",
+    socket: {
+      remoteAddress: "127.0.0.1",
+    },
+  };
+  const res = createMockResponse();
+
+  await handler(req, res);
+
+  assert.equal(res.statusCode, 403);
+  assert.deepEqual(res.body, { ok: false, error: "Origin not allowed" });
+});

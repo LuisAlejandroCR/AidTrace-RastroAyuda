@@ -387,8 +387,8 @@ Why: local code now has stricter CORS, relay validation, generic browser errors,
 Files: api/zavu.mjs, README.md, AUDIT_BLOCKS.md, test/zavu-handler.test.mjs.
 Action: review diff, push to GitHub manually, and let Vercel deploy.
 Acceptance: deployed /api/zavu still accepts valid browser relay from the app origin and valid Telegram webhook events.
-Issue: addresses GitHub issue #1 by rejecting empty/unsupported /api/zavu POSTs, enforcing browser Origin checks, documenting webhook-token limitations, and adding relay regression tests.
-Last verified locally: npm.cmd run test passed 13 tests; npm.cmd run check passed.
+Issue: addresses GitHub issue #1 by rejecting empty/unsupported /api/zavu POSTs, enforcing browser Origin checks before body handling, documenting webhook-token limitations, and adding relay regression tests.
+Last verified locally: npm.cmd run test passed 14 tests; npm.cmd run check passed.
 
 P0-01 - AIDTRACE_WEBHOOK_TOKEN
 Status: PARTIAL - header probe shows current Zavu webhook does not attach custom headers; keep env unset unless a Zavu Function/proxy is added.
@@ -418,7 +418,8 @@ Action: submit one browser offline proof and let it sync.
 Action: send one Telegram message through Zavu.
 Action: send a relay request from an unknown Origin and confirm rejection.
 Acceptance: valid app and Telegram paths work; unknown Origin does not write to Celo.
-Local regression: empty /api/zavu POST returns 400; unknown-origin browser relay returns 403.
+Local regression: empty /api/zavu POST returns 400; unknown-origin browser relay returns 403 before body handling.
+Deploy note: production returned 500 for the bad-origin relay before the early-origin guard was added; rerun final-demo-check.ps1 after deploying this patch.
 
 P0-02 - Supabase durable queue table
 Status: SQL executed; worker smoke test reached Supabase.
