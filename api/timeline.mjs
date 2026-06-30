@@ -25,6 +25,17 @@ const TIMELINE_INDEX_ENABLED = process.env.AIDTRACE_TIMELINE_INDEX_ENABLED !== "
 const SUPABASE_URL = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const NORMALIZED_CONTRACT_ADDRESS = CONTRACT_ADDRESS.toLowerCase();
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://aidtrace-rastroayuda.vercel.app",
+  "http://127.0.0.1:8017",
+  "http://localhost:8017",
+];
+const ALLOWED_ORIGINS = new Set(
+  (process.env.AIDTRACE_ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(","))
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
 
 const aidTraceEvent = parseAbiItem(
   "event AidTraceEvent(bytes32 indexed batchId, bytes32 indexed actionType, address indexed sender, bytes32 dataHash, string referenceURI, uint16 schemaVersion, uint16 flags)"
@@ -34,6 +45,24 @@ const publicClient = createPublicClient({
   chain: celo,
   transport: http(CELO_RPC_URL),
 });
+
+function requestOrigin(req) {
+  return String(req.headers.origin || "");
+}
+
+function isAllowedOrigin(origin) {
+  return Boolean(origin && ALLOWED_ORIGINS.has(origin));
+}
+
+function setCors(req, res) {
+  const origin = requestOrigin(req);
+  if (isAllowedOrigin(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
 
 function bytes32ToText(value) {
   const clean = String(value || "")
@@ -267,16 +296,23 @@ async function indexNewTimelineEvents(defaultFromBlock) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  setCors(req, res);
 
   if (req.method === "OPTIONS") {
+    const origin = requestOrigin(req);
+    if (origin && !isAllowedOrigin(origin)) {
+      return res.status(403).send("Origin not allowed");
+    }
     return res.status(204).end();
   }
 
   if (req.method !== "GET") {
     return res.status(405).send("Method not allowed");
+  }
+
+  const origin = requestOrigin(req);
+  if (origin && !isAllowedOrigin(origin)) {
+    return res.status(403).json({ ok: false, error: "Origin not allowed" });
   }
 
   try {
