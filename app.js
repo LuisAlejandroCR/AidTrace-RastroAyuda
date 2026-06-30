@@ -7,9 +7,9 @@ const RELAY_ENDPOINT = `${APP_ORIGIN}/api/zavu`;
 const TIMELINE_ENDPOINT = `${APP_ORIGIN}/api/timeline`;
 const STORE_KEY = "aidtrace_state_v4";
 const ONLINE_RELOAD_KEY = "aidtrace_reloaded_after_online";
-const TIMELINE_FETCH_LIMIT = 30;
-const TIMELINE_FETCH_ALL_LIMIT = 100;
+const TIMELINE_FETCH_LIMIT = 100;
 const TIMELINE_PAGE_SIZE = 10;
+const TIMELINE_PAGE_BUTTONS = 10;
 
 const NETWORK = {
   name: "Celo Mainnet",
@@ -92,6 +92,9 @@ const translations = {
     showMore: "Show more",
     seeAll: "See all",
     showLess: "Show less",
+    pagePrevious: "Previous page",
+    pageNext: "Next page",
+    pageTop: "Back to top",
     actionCreated: "Created",
     actionPickedUp: "Picked up",
     actionArrived: "Arrived",
@@ -172,6 +175,9 @@ const translations = {
     showMore: "Ver mas",
     seeAll: "Ver todo",
     showLess: "Ver menos",
+    pagePrevious: "Pagina anterior",
+    pageNext: "Pagina siguiente",
+    pageTop: "Volver arriba",
     actionCreated: "Creado",
     actionPickedUp: "Recogido",
     actionArrived: "Llego",
@@ -189,8 +195,7 @@ const defaultState = {
 };
 
 let state = loadState();
-let timelineVisibleCount = TIMELINE_PAGE_SIZE;
-let timelineShowAll = false;
+let timelinePage = 1;
 const qrPrintLinks = new Map();
 const $ = (id) => document.getElementById(id);
 
@@ -333,9 +338,16 @@ function mergeEvents(incomingEvents) {
       .filter((event) => event.txHash)
       .map((event) => [String(event.txHash).toLowerCase(), event.id]),
   );
+  const pendingKeys = new Map(
+    state.events
+      .filter((event) => event.status === "pending")
+      .map((event) => [eventMatchKey(event), event.id]),
+  );
 
   for (const event of incomingEvents) {
-    const existingId = event.txHash ? idByTxHash.get(String(event.txHash).toLowerCase()) : null;
+    const existingId =
+      (event.txHash ? idByTxHash.get(String(event.txHash).toLowerCase()) : null) ||
+      pendingKeys.get(eventMatchKey(event));
     if (existingId && existingId !== event.id) {
       currentById.delete(existingId);
     }
@@ -353,28 +365,46 @@ function mergeEvents(incomingEvents) {
   );
 }
 
+function normalizeText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function eventMatchKey(event) {
+  return [
+    String(event.batchId || "").toUpperCase(),
+    String(event.actionType || "").toUpperCase(),
+    normalizeText(event.note || eventDescription(event)),
+  ].join("|");
+}
+
 async function loadOnchainTimeline({ silent = true, limit = TIMELINE_FETCH_LIMIT } = {}) {
   if (!navigator.onLine || !TIMELINE_ENDPOINT) return;
   try {
-    const response = await fetch(`${TIMELINE_ENDPOINT}?limit=${limit}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) throw new Error(`Timeline failed: ${response.status}`);
-    const payload = await response.json();
-    const events = (payload.events || []).map((event) => ({
-      id: event.id,
-      batchId: event.batchId,
-      actionType: event.actionType,
-      senderName: "",
-      locationText: "",
-      note: event.details || event.referenceURI || "",
-      dataHash: event.dataHash,
-      status: "sent_to_relayer",
-      txHash: event.txHash,
-      qrLink: event.qrLink || event.txUrl,
-      syncedAt: event.blockTimestamp,
-      createdAt: event.blockTimestamp,
-    }));
+    let cursor = 0;
+    const events = [];
+    for (let page = 0; page < 20; page += 1) {
+      const response = await fetch(`${TIMELINE_ENDPOINT}?limit=${limit}&cursor=${cursor}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`Timeline failed: ${response.status}`);
+      const payload = await response.json();
+      events.push(...(payload.events || []).map((event) => ({
+        id: event.id,
+        batchId: event.batchId,
+        actionType: event.actionType,
+        senderName: "",
+        locationText: "",
+        note: event.details || event.referenceURI || "",
+        dataHash: event.dataHash,
+        status: "sent_to_relayer",
+        txHash: event.txHash,
+        qrLink: event.qrLink || event.txUrl,
+        syncedAt: event.blockTimestamp,
+        createdAt: event.blockTimestamp,
+      })));
+      if (!payload.pagination?.hasMore || payload.pagination.nextCursor == null) break;
+      cursor = payload.pagination.nextCursor;
+    }
     mergeEvents(events);
     saveState();
     if (!silent && events.length) notify(t("timelineLoaded"));
@@ -584,6 +614,12 @@ function showScreen(name) {
   });
 }
 
+function clampTimelinePage() {
+  const totalPages = Math.max(1, Math.ceil(state.events.length / TIMELINE_PAGE_SIZE));
+  timelinePage = Math.min(Math.max(1, timelinePage), totalPages);
+  return totalPages;
+}
+
 function applyLanguage() {
   document.documentElement.lang = state.language;
   document.querySelectorAll("[data-i18n]").forEach((node) => {
@@ -605,6 +641,12 @@ function applyLanguage() {
     languageToggle.setAttribute("aria-label", label);
     languageToggle.setAttribute("title", label);
   }
+
+  const topButton = document.querySelector("[data-timeline-top]");
+  if (topButton) {
+    topButton.setAttribute("aria-label", t("pageTop"));
+    topButton.setAttribute("title", t("pageTop"));
+  }
 }
 function render() {
   applyLanguage();
@@ -622,18 +664,46 @@ function render() {
     return;
   }
 
-  const visibleEvents = timelineShowAll
-    ? state.events
-    : state.events.slice(0, timelineVisibleCount);
-  const hasMore = visibleEvents.length < state.events.length;
+  const totalPages = clampTimelinePage();
+  const pageStart = (timelinePage - 1) * TIMELINE_PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + TIMELINE_PAGE_SIZE, state.events.length);
+  const visibleEvents = state.events.slice(pageStart, pageEnd);
+  const pageWindowStart = Math.floor((timelinePage - 1) / TIMELINE_PAGE_BUTTONS) * TIMELINE_PAGE_BUTTONS + 1;
+  const pageWindowEnd = Math.min(totalPages, pageWindowStart + TIMELINE_PAGE_BUTTONS - 1);
 
   timelineControls.forEach((controls) => {
     controls.removeAttribute("hidden");
     controls.querySelector("[data-timeline-count]").textContent =
-      `${t("timelineShowing")} ${visibleEvents.length} ${t("timelineOf")} ${state.events.length}`;
-    controls.querySelector("[data-timeline-more]").hidden = !hasMore;
-    controls.querySelector("[data-timeline-all]").hidden = timelineShowAll || !hasMore;
-    controls.querySelector("[data-timeline-less]").hidden = !timelineShowAll && timelineVisibleCount <= TIMELINE_PAGE_SIZE;
+      `${t("timelineShowing")} ${pageStart + 1}-${pageEnd} ${t("timelineOf")} ${state.events.length}`;
+    const pages = controls.querySelector("[data-timeline-pages]");
+    pages.textContent = "";
+    const previous = document.createElement("button");
+    previous.className = "secondary compact page-button";
+    previous.type = "button";
+    previous.textContent = "‹";
+    previous.disabled = timelinePage === 1;
+    previous.setAttribute("aria-label", t("pagePrevious"));
+    previous.dataset.timelinePage = String(timelinePage - 1);
+    pages.appendChild(previous);
+
+    for (let page = pageWindowStart; page <= pageWindowEnd; page += 1) {
+      const button = document.createElement("button");
+      button.className = `secondary compact page-button${page === timelinePage ? " is-active" : ""}`;
+      button.type = "button";
+      button.textContent = String(page);
+      button.dataset.timelinePage = String(page);
+      button.setAttribute("aria-current", page === timelinePage ? "page" : "false");
+      pages.appendChild(button);
+    }
+
+    const next = document.createElement("button");
+    next.className = "secondary compact page-button";
+    next.type = "button";
+    next.textContent = "›";
+    next.disabled = timelinePage === totalPages;
+    next.setAttribute("aria-label", t("pageNext"));
+    next.dataset.timelinePage = String(timelinePage + 1);
+    pages.appendChild(next);
   });
 
   const template = $("itemTemplate");
@@ -678,29 +748,18 @@ document.querySelectorAll("[data-screen-target]").forEach((button) => {
   button.addEventListener("click", () => showScreen(button.dataset.screenTarget));
 });
 
-document.querySelectorAll("[data-timeline-more]").forEach((button) => {
-  button.addEventListener("click", () => {
-    timelineVisibleCount += TIMELINE_PAGE_SIZE;
-    timelineShowAll = false;
-    render();
-  });
-});
-
-document.querySelectorAll("[data-timeline-all]").forEach((button) => {
-  button.addEventListener("click", async () => {
-    timelineShowAll = true;
-    await loadOnchainTimeline({ silent: true, limit: TIMELINE_FETCH_ALL_LIMIT });
-    render();
-  });
-});
-
-document.querySelectorAll("[data-timeline-less]").forEach((button) => {
-  button.addEventListener("click", () => {
-    timelineVisibleCount = TIMELINE_PAGE_SIZE;
-    timelineShowAll = false;
+document.querySelectorAll("[data-timeline-controls]").forEach((controls) => {
+  controls.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-timeline-page]");
+    if (!button || button.disabled) return;
+    timelinePage = Number(button.dataset.timelinePage);
     render();
     $("screen-timeline").scrollIntoView({ behavior: "smooth", block: "start" });
   });
+});
+
+document.querySelector("[data-timeline-top]").addEventListener("click", () => {
+  $("screen-timeline").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 $("timeline").addEventListener("click", (event) => {

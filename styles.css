@@ -60,13 +60,14 @@ h1 {
   display: inline-flex;
   align-items: flex-end;
   gap: clamp(8px, 2vw, 14px);
+  flex-wrap: wrap;
 }
 
 .brand-mark {
-  width: clamp(58px, 6vw, 78px);
-  height: clamp(58px, 6vw, 78px);
+  width: clamp(76px, 8vw, 112px);
+  height: clamp(76px, 8vw, 112px);
   flex: 0 0 auto;
-  margin-bottom: 2px;
+  margin-bottom: -2px;
   overflow: visible;
 }
 
@@ -150,6 +151,7 @@ h2 {
   cursor: pointer;
   box-shadow: 0 12px 30px rgba(31, 65, 52, 0.08);
   flex: 0 0 auto;
+  max-width: 100%;
 }
 
 .language-button:hover {
@@ -344,6 +346,39 @@ button {
   justify-content: flex-end;
 }
 
+.pagination {
+  align-items: center;
+}
+
+.page-button {
+  min-width: 38px;
+  padding-inline: 10px;
+}
+
+.page-button.is-active {
+  background: var(--sage-dark);
+  border-color: var(--sage-dark);
+  color: #fff;
+}
+
+.page-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.back-to-top {
+  display: block;
+  width: 46px;
+  min-height: 46px;
+  margin: 18px auto 0;
+  padding: 0;
+  border-radius: 999px;
+  background: var(--sage-dark);
+  color: #fff;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
 .timeline-item {
   display: grid;
   grid-template-columns: 98px minmax(0, 1fr);
@@ -519,6 +554,7 @@ dd {
 @media (max-width: 760px) {
   .app-header {
     align-items: start;
+    flex-direction: column;
   }
 
   .brand-title {
@@ -527,8 +563,12 @@ dd {
   }
 
   .brand-mark {
-    width: 44px;
-    height: 44px;
+    width: 58px;
+    height: 58px;
+  }
+
+  h1 {
+    font-size: clamp(3rem, 17vw, 4.4rem);
   }
 
   .tabbar {
@@ -542,7 +582,7 @@ dd {
 
   @media (max-width: 640px) {
     .language-button {
-      width: 190px;
+      width: 100%;
       min-height: 46px;
       font-size: 0.92rem;
       padding: 12px 18px;
@@ -570,7 +610,38 @@ dd {
 
   .timeline-controls div,
   .timeline-controls button {
+    width: auto;
+  }
+
+  .timeline-controls .pagination {
+    justify-content: flex-start;
     width: 100%;
+  }
+
+  .timeline-item {
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .tag svg {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+@media (max-width: 430px) {
+  .timeline-item {
+    grid-template-columns: 1fr;
+  }
+
+  .tag {
+    width: 112px;
+  }
+
+  .page-button {
+    min-width: 34px;
+    padding-inline: 8px;
   }
 }
 

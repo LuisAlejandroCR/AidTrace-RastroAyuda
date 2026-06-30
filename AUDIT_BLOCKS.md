@@ -484,11 +484,12 @@ Acceptance: /api/timeline?limit=30 returns bounded data under target latency.
 Last verified deployed: /api/timeline?limit=30 returned pagination.nextCursor=30 and final-demo-check.ps1 verified the cursor page returns ok=true.
 
 P1-03 - Relayer key rotation drill
-Status: runbook ready; pending manual runbook test.
+Status: passed after deploy.
 Why: relayer is a hot key and must be revocable.
 Files: AidTraceLedger.sol, scripts/setup-zavu-relayer.ps1, scripts/relayer-rotation.md, Vercel envs.
 Action: create a second relayer, grant submitter role, update Vercel, revoke old relayer.
 Acceptance: app writes with the new relayer and old relayer can no longer write.
+Last verified deployed: new relayer wrote Telegram queue event 0x332d57fc44b26d3cc5cfc3467126da2354a2eff3bf19b9f81d08217739a77616, follow-up Telegram proof 0x73d965e7f79cf28116ab91981694f2e2ee32942015a29a9098d104dc2cdee20c succeeded, and old relayer was revoked by operator.
 
 P1-04 - Timeline endpoint CORS policy
 Status: passed after deploy.
@@ -518,13 +519,14 @@ Acceptance: malformed or changed referenceURI behavior is caught.
 Last verified: npm run test passed 11 total parser and timeline parser tests.
 
 P2-03 - CI pipeline
-Status: workflow ready; pending GitHub run after push.
+Status: passed after push.
 Why: no automated check protects the hackathon demo from regressions.
 Files: .github/workflows/ci.yml, package.json.
 Action: run npm install and npm test or node --check commands. DONE locally via npm run test and npm.cmd run check.
 Action: add .github/workflows/ci.yml. DONE.
-Action: push to GitHub and confirm the workflow passes. PENDING.
+Action: push to GitHub and confirm the workflow passes. DONE.
 Acceptance: GitHub Actions fails on syntax or parser regression.
+Last verified deployed: GitHub Actions CI run passed on main after "Harden AidTrace relay and complete audit blocks".
 
 P2-04 - PWA icons
 Status: passed after deploy.
