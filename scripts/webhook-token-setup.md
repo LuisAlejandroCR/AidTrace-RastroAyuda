@@ -40,7 +40,9 @@ hasAidTraceHeader: true
 aidTraceHeaderLength: 17
 ```
 
-If the header appears, Zavu can attach the header and it is safe to proceed with the real token. If the header does not appear, do not set `AIDTRACE_WEBHOOK_TOKEN` yet; Telegram inbound calls will be rejected by AidTrace.
+If the header appears, Zavu can attach the header and it is safe to proceed with the real token.
+
+If the probe returns `hasAidTraceHeader: false` and `hasBearer: false`, do not set `AIDTRACE_WEBHOOK_TOKEN` yet. Telegram inbound calls will be rejected by AidTrace. Keep the env unset for the demo, or add a server-side Zavu Function/proxy that forwards inbound events to AidTrace with `X-AidTrace-Webhook-Token` attached.
 
 After the probe, restore the Zavu inbound webhook URL to:
 
@@ -89,4 +91,4 @@ Registrado en Celo: REVIEW AT-CELO-1
 Tx: https://celoscan.io/tx/<tx_hash>
 ```
 
-If Telegram stops recording and Vercel logs show `401`, the Zavu header is missing or does not match. Remove `AIDTRACE_WEBHOOK_TOKEN` from Vercel, redeploy, and keep the endpoint protected by the current browser-origin, idempotency, rate-limit, and queue controls until Zavu custom headers are confirmed.
+If Telegram stops recording and Vercel logs show `401`, the Zavu header is missing or does not match. Remove `AIDTRACE_WEBHOOK_TOKEN` from Vercel, redeploy, and keep the endpoint protected by the current browser-origin, idempotency, rate-limit, and queue controls until Zavu custom headers or a Zavu Function/proxy are confirmed.

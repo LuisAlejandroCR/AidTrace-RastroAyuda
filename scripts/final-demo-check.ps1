@@ -18,6 +18,19 @@ function Assert-Ok($Condition, $Message) {
   Write-Host "OK: $Message" -ForegroundColor Green
 }
 
+function Invoke-CurlProbe($Arguments) {
+  $output = & curl.exe @Arguments 2>$null
+  $text = ($output -join "`n")
+  $status = 0
+  if ($text -match "HTTP/\S+\s+(\d{3})") {
+    $status = [int]$Matches[1]
+  }
+  return @{
+    StatusCode = $status
+    Text = $text
+  }
+}
+
 Step "Local parser and syntax checks"
 npm.cmd run test
 npm.cmd run check
@@ -43,19 +56,13 @@ if ($timeline.pagination.nextCursor -ne $null) {
 }
 
 Step "Timeline CORS allowlist"
-$headers = @{ "Origin" = $Origin }
-$cors = Invoke-WebRequest -Method OPTIONS -Uri "$BaseUrl/api/timeline" -Headers $headers
+$cors = Invoke-CurlProbe @("-s", "-i", "-X", "OPTIONS", "$BaseUrl/api/timeline", "-H", "Origin: $Origin")
 Assert-Ok ($cors.StatusCode -eq 204) "allowed Origin receives OPTIONS 204"
-Assert-Ok ($cors.Headers["Access-Control-Allow-Origin"] -eq $Origin) "allowed Origin is echoed"
+Assert-Ok ($cors.Text -match "Access-Control-Allow-Origin:\s*$([regex]::Escape($Origin))") "allowed Origin is echoed"
 
 Step "Timeline CORS rejection"
-try {
-  Invoke-WebRequest -Method OPTIONS -Uri "$BaseUrl/api/timeline" -Headers @{ "Origin" = "https://evil.example" } | Out-Null
-  throw "unknown Origin was not rejected"
-} catch {
-  $status = $_.Exception.Response.StatusCode.value__
-  Assert-Ok ($status -eq 403) "unknown Origin is rejected with 403"
-}
+$badCors = Invoke-CurlProbe @("-s", "-i", "-X", "OPTIONS", "$BaseUrl/api/timeline", "-H", "Origin: https://evil.example")
+Assert-Ok ($badCors.StatusCode -eq 403) "unknown Origin is rejected with 403"
 
 Step "Browser relay bad origin rejection"
 $badRelayBody = @{
@@ -63,17 +70,15 @@ $badRelayBody = @{
   pending = @()
 } | ConvertTo-Json -Depth 5
 
-try {
-  Invoke-WebRequest `
-    -Method POST `
-    -Uri "$BaseUrl/api/zavu" `
-    -Headers @{ "Origin" = "https://evil.example"; "Content-Type" = "application/json" } `
-    -Body $badRelayBody | Out-Null
-  throw "unknown Origin browser relay was not rejected"
-} catch {
-  $status = $_.Exception.Response.StatusCode.value__
-  Assert-Ok ($status -eq 403) "unknown Origin browser relay is rejected with 403"
-}
+$badRelay = Invoke-CurlProbe @(
+  "-s", "-i",
+  "-X", "POST",
+  "$BaseUrl/api/zavu",
+  "-H", "Origin: https://evil.example",
+  "-H", "Content-Type: application/json",
+  "--data", $badRelayBody
+)
+Assert-Ok ($badRelay.StatusCode -eq 403) "unknown Origin browser relay is rejected with 403"
 
 Write-Host ""
 Write-Host "Final demo smoke checks passed." -ForegroundColor Green

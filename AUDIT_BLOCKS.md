@@ -39,7 +39,7 @@ Required changes:
 
 ```text
 1. Split webhook traffic from browser relay traffic, or enforce separate auth rules per traffic type. DONE in api/zavu.mjs.
-2. Zavu webhook path: require a shared webhook secret or Zavu signature header before processing message.inbound. PARTIAL via optional AIDTRACE_WEBHOOK_TOKEN.
+2. Zavu webhook path: require a shared webhook secret or Zavu signature header before processing message.inbound. PARTIAL via optional AIDTRACE_WEBHOOK_TOKEN; current Zavu webhook cannot attach custom headers.
 3. Browser relay path: add abuse controls because a static browser cannot safely hold a secret. PASSED via origin allowlist, payload validation, persistent idempotency, and Supabase rate limit guard.
    Minimum demo control: strict origin allowlist + payload validation + per-IP/per-batch rate limit. PASSED.
    Stronger control: queue first, approve/process server-side, then write to Celo.
@@ -51,7 +51,7 @@ Acceptance checks:
 
 ```text
 curl -X POST https://<app>/api/zavu -H "Content-Type: application/json" -d "{}"
-# Expected: 401/403 or harmless ignored response. No Celo transaction.
+# Expected: 400 unsupported event. No Celo transaction.
 
 curl -X POST https://<app>/api/zavu -H "Origin: https://evil.example" -H "Content-Type: application/json" -d "{\"schema\":\"aidtrace.relay.v1\",\"pending\":[]}"
 # Expected: rejected by origin/auth/rate policy.
@@ -382,26 +382,28 @@ Execution order:
 4. P2-01, P2-02, P2-03, P2-04, P2-05
 
 P0-00 - Deploy current relay hardening changes
-Status: pending deploy.
+Status: fixed locally; pending deploy.
 Why: local code now has stricter CORS, relay validation, generic browser errors, and optional webhook token support.
-Files: api/zavu.mjs, README.md, AUDIT_BLOCKS.md.
+Files: api/zavu.mjs, README.md, AUDIT_BLOCKS.md, test/zavu-handler.test.mjs.
 Action: review diff, push to GitHub manually, and let Vercel deploy.
 Acceptance: deployed /api/zavu still accepts valid browser relay from the app origin and valid Telegram webhook events.
+Issue: addresses GitHub issue #1 by rejecting empty/unsupported /api/zavu POSTs, enforcing browser Origin checks, documenting webhook-token limitations, and adding relay regression tests.
+Last verified locally: npm.cmd run test passed 13 tests; npm.cmd run check passed.
 
 P0-01 - AIDTRACE_WEBHOOK_TOKEN
-Status: runbook ready; pending Zavu custom header setup and deploy verification.
+Status: PARTIAL - header probe shows current Zavu webhook does not attach custom headers; keep env unset unless a Zavu Function/proxy is added.
 Why: protects Zavu inbound webhook from unauthenticated callers.
 Env: AIDTRACE_WEBHOOK_TOKEN.
 Files: api/zavu.mjs, api/header-probe.mjs, scripts/webhook-token-setup.md, README.md.
-Action: use scripts/webhook-token-setup.md to prove Zavu can attach X-AidTrace-Webhook-Token to /api/header-probe.
-Action: create a long random token only after the header probe passes.
-Action: configure Zavu webhook delivery to send the same value as X-AidTrace-Webhook-Token or Authorization: Bearer <token>.
-Do not: enable this env until Zavu sends the header, or Telegram inbound will return 401.
-Rollback: remove AIDTRACE_WEBHOOK_TOKEN from Vercel and redeploy if Zavu cannot attach the header yet.
-Acceptance: Telegram message records on Celo after token is enabled.
+Observed: /api/header-probe returned hasAidTraceHeader=false and hasBearer=false for userAgent Zavu-Webhook/1.0.
+Action: do not enable AIDTRACE_WEBHOOK_TOKEN with the current Zavu webhook.
+Action: keep Telegram protected by queue serialization, generic errors, Celo write lock, and existing endpoint monitoring for the demo.
+Future action: add a Zavu Function/proxy that forwards inbound events to /api/zavu with X-AidTrace-Webhook-Token, then enable AIDTRACE_WEBHOOK_TOKEN.
+Rollback: remove AIDTRACE_WEBHOOK_TOKEN from Vercel and redeploy if Telegram inbound returns 401.
+Acceptance: Telegram message records on Celo with AIDTRACE_WEBHOOK_TOKEN unset today, or with token enabled only after a header-capable proxy is live.
 
 P0-06 - AIDTRACE_ALLOWED_ORIGINS
-Status: pending deploy verification.
+Status: PARTIAL - deployed timeline allowlist verified manually; /api/zavu deploy verification still pending after latest issue #1 patch.
 Why: /api/zavu now only sets CORS for allowed browser origins and rejects browser relay requests from unknown origins.
 Env: AIDTRACE_ALLOWED_ORIGINS.
 Required value: https://aidtrace-rastroayuda.vercel.app,http://127.0.0.1:8017,http://localhost:8017
@@ -409,13 +411,14 @@ Action: set the env in Vercel before or with the hardening deploy.
 Acceptance: browser app sync works from production; unknown Origin relay request is rejected.
 
 P0-07 - Relay hardening smoke tests
-Status: pending after deploy.
+Status: PARTIAL - final-demo-check.ps1 updated to use curl.exe for CORS probes; browser relay and Telegram smoke tests still pending after deploy.
 Why: confirms Block 1 did not break the demo path.
-Files: api/zavu.mjs, app.js.
+Files: api/zavu.mjs, app.js, scripts/final-demo-check.ps1, test/zavu-handler.test.mjs.
 Action: submit one browser offline proof and let it sync.
 Action: send one Telegram message through Zavu.
 Action: send a relay request from an unknown Origin and confirm rejection.
 Acceptance: valid app and Telegram paths work; unknown Origin does not write to Celo.
+Local regression: empty /api/zavu POST returns 400; unknown-origin browser relay returns 403.
 
 P0-02 - Supabase durable queue table
 Status: SQL executed; worker smoke test reached Supabase.

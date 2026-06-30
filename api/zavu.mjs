@@ -728,7 +728,8 @@ export default async function handler(req, res) {
     }
 
     if (event.type !== "message.inbound") {
-      return res.status(200).send("Ignored");
+      console.warn("Rejected unsupported Zavu event shape");
+      return res.status(400).json({ ok: false, error: "Unsupported event" });
     }
 
     if (!hasValidWebhookToken(req)) {

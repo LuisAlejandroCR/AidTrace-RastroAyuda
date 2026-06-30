@@ -253,7 +253,7 @@ Optional webhook hardening:
 AIDTRACE_WEBHOOK_TOKEN=<random long token>
 ```
 
-Only set `AIDTRACE_WEBHOOK_TOKEN` after Zavu is configured to send the same value as `X-AidTrace-Webhook-Token` or `Authorization: Bearer <token>` with inbound webhook requests. Prove this first with the header probe in `scripts/webhook-token-setup.md`.
+Only set `AIDTRACE_WEBHOOK_TOKEN` after Zavu is configured to send the same value as `X-AidTrace-Webhook-Token` or `Authorization: Bearer <token>` with inbound webhook requests. Prove this first with the header probe in `scripts/webhook-token-setup.md`. If Zavu cannot attach custom headers, keep this env unset for the demo or add a server-side Zavu Function/proxy that forwards inbound events with the header attached.
 
 Setup and rollback runbook:
 
