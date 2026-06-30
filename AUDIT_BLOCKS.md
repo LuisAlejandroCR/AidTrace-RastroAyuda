@@ -146,7 +146,7 @@ Required changes:
 1. Store indexed events in Supabase or another durable read model. SQL READY in supabase/aidtrace_timeline.sql.
 2. Track last_indexed_block per contract. SQL/API READY.
 3. On refresh, fetch only new logs from last_indexed_block + 1 to latest. API READY.
-4. Serve timeline from the indexed table with limit/cursor pagination. LIMIT READY; cursor remains future.
+4. Serve timeline from the indexed table with limit/cursor pagination. DONE; `/api/timeline` returns pagination.nextCursor when more rows exist.
 5. Keep an admin-only reindex path for recovery.
 ```
 
@@ -306,6 +306,12 @@ Push branch to GitHub.
 
 ## Block 7 - PWA Installability
 
+Status:
+
+```text
+CODE READY - manifest has 192x192, 512x512, and 512x512 maskable PNG icons. Service worker cache was bumped to aidtrace-v14 and now includes the icon assets.
+```
+
 Risk:
 
 ```text
@@ -323,10 +329,10 @@ sw.js
 Required changes:
 
 ```text
-1. Add 192x192 and 512x512 PNG icons.
-2. Add maskable icon if possible.
-3. Include purpose fields: "any maskable" for the 512 icon.
-4. Bump service worker cache after adding assets.
+1. Add 192x192 and 512x512 PNG icons. DONE in assets/icons.
+2. Add maskable icon if possible. DONE.
+3. Include purpose fields: "any maskable" for the 512 icon. DONE.
+4. Bump service worker cache after adding assets. DONE, aidtrace-v14.
 ```
 
 Acceptance checks:
@@ -459,10 +465,11 @@ Action: track last_indexed_block per contract.
 Acceptance: /api/timeline does not rescan from deployment block on every request.
 
 P1-02 - Timeline pagination from indexed data
-Status: limit ready; cursor pagination pending.
+Status: code ready; pending deploy verification.
 Why: timeline should stay fast after hundreds or thousands of events.
 Files: api/timeline.mjs, app.js.
-Action: serve timeline from indexed table with limit/cursor.
+Action: serve timeline from indexed table with limit/cursor. DONE in api/timeline.mjs.
+Action: deploy and call /api/timeline?limit=30; if pagination.nextCursor is present, call /api/timeline?limit=30&cursor=<nextCursor>.
 Acceptance: /api/timeline?limit=30 returns bounded data under target latency.
 
 P1-03 - Relayer key rotation drill
@@ -508,11 +515,11 @@ Action: push to GitHub and confirm the workflow passes. PENDING.
 Acceptance: GitHub Actions fails on syntax or parser regression.
 
 P2-04 - PWA icons
-Status: pending.
+Status: code ready; pending browser manifest verification after deploy.
 Why: manifest.webmanifest has an empty icons array.
-Files: manifest.webmanifest, sw.js, icon assets.
-Action: add 192x192 and 512x512 PNG icons, preferably maskable.
-Action: bump service worker cache after adding icon assets.
+Files: manifest.webmanifest, sw.js, assets/icons/icon-192.png, assets/icons/icon-512.png, assets/icons/icon-maskable-512.png.
+Action: add 192x192 and 512x512 PNG icons, preferably maskable. DONE.
+Action: bump service worker cache after adding icon assets. DONE.
 Acceptance: browser Application > Manifest shows no icon warnings.
 
 P2-05 - Final demo verification

@@ -142,6 +142,7 @@ styles.css                  Responsive UI, mobile form behavior, print styles
 app.js                      PWA state, offline queue, QR/PDF, timeline rendering
 sw.js                       Service worker cache and background sync handoff
 qrcode.js                   Local QR generator
+assets/icons/*.png          PWA install icons
 api/zavu.mjs                Browser relay endpoint and Zavu Telegram webhook
 api/process-queue.mjs       Protected queue worker that processes one Supabase queued Celo write per call
 api/timeline.mjs            Celo timeline reader with Supabase index fallback
@@ -282,6 +283,7 @@ Use the runbook if `RASTROAYUDA_RELAYER_PRIVATE_KEY` is exposed or if the hot ke
 8. Open the transaction and inspect `referenceURI`.
 9. Confirm the event appears in the app timeline.
 10. Call `/api/timeline?limit=30` twice and confirm the second call returns from the indexed cache without a full historical scan.
+11. If `pagination.nextCursor` is present, call `/api/timeline?limit=30&cursor=<nextCursor>` to inspect the next page.
 
 ## Notes
 

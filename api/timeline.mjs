@@ -99,6 +99,12 @@ function hasSupabaseTimeline() {
   return TIMELINE_INDEX_ENABLED && Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 }
 
+function pageCursor(value) {
+  const cursor = Number(value || 0);
+  if (!Number.isFinite(cursor) || cursor < 0) return 0;
+  return Math.floor(cursor);
+}
+
 function supabaseHeaders(prefer = "") {
   return {
     apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -240,9 +246,9 @@ async function upsertIndexedEvents(events) {
   });
 }
 
-async function loadIndexedTimeline(limit) {
+async function loadIndexedTimeline(limit, cursor) {
   const rows = await supabaseRequest(
-    `aidtrace_timeline_events?contract_address=eq.${encodeURIComponent(NORMALIZED_CONTRACT_ADDRESS)}&select=*&order=block_number.desc,log_index.desc&limit=${limit}`,
+    `aidtrace_timeline_events?contract_address=eq.${encodeURIComponent(NORMALIZED_CONTRACT_ADDRESS)}&select=*&order=block_number.desc,log_index.desc&limit=${limit + 1}&offset=${cursor}`,
   );
 
   return Array.isArray(rows) ? rows.map(timelineRowToEvent) : [];
@@ -295,24 +301,37 @@ export default async function handler(req, res) {
 
   try {
     const limit = Math.min(Number(req.query.limit || 50), 100);
+    const cursor = pageCursor(req.query.cursor);
     const fromBlock = await timelineFromBlock();
     let events;
     let index = null;
 
     if (hasSupabaseTimeline()) {
       index = await indexNewTimelineEvents(fromBlock);
-      events = await loadIndexedTimeline(limit);
+      events = await loadIndexedTimeline(limit, cursor);
     } else {
       const logs = await getAidTraceLogs(fromBlock);
-      events = (await buildEventsFromLogs(logs.slice(-limit))).reverse();
+      const orderedEvents = (await buildEventsFromLogs(logs)).sort(
+        (a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex,
+      );
+      events = orderedEvents.slice(cursor, cursor + limit + 1);
     }
+
+    const hasMore = events.length > limit;
+    const pageEvents = hasMore ? events.slice(0, limit) : events;
 
     return res.status(200).json({
       ok: true,
       contractAddress: CONTRACT_ADDRESS,
       indexed: Boolean(index),
       index,
-      events,
+      pagination: {
+        limit,
+        cursor,
+        nextCursor: hasMore ? cursor + limit : null,
+        hasMore,
+      },
+      events: pageEvents,
     });
   } catch (error) {
     console.error("Timeline error:", error);

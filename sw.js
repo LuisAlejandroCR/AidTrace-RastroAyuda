@@ -1,7 +1,16 @@
-const CACHE = "aidtrace-v13";
+const CACHE = "aidtrace-v14";
 const DB_NAME = "aidtrace-sync-db";
 const STORE = "packets";
-const ASSETS = ["./index.html", "./styles.css", "./qrcode.js", "./app.js", "./manifest.webmanifest"];
+const ASSETS = [
+  "./index.html",
+  "./styles.css",
+  "./qrcode.js",
+  "./app.js",
+  "./manifest.webmanifest",
+  "./assets/icons/icon-192.png",
+  "./assets/icons/icon-512.png",
+  "./assets/icons/icon-maskable-512.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
