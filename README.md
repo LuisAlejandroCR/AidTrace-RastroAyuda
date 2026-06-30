@@ -147,7 +147,9 @@ api/process-queue.mjs       Protected queue worker that processes one Supabase q
 api/timeline.mjs            Celo timeline reader with Supabase index fallback
 AidTraceLedger.sol          On-chain proof ledger
 scripts/send-zavu-message.mjs Outbound channel smoke test
+scripts/relayer-rotation.md Relayer key rotation and emergency revocation runbook
 supabase/aidtrace_queue.sql Supabase durable queue table and RPCs for serialized Celo writes
+supabase/aidtrace_relay_guard.sql Supabase browser relay idempotency and per-minute abuse guard
 supabase/aidtrace_timeline.sql Supabase indexed timeline cache for bounded reads
 ```
 
@@ -216,10 +218,20 @@ AIDTRACE_BROWSER_QUEUE_ENABLED=true
 
 Leave `AIDTRACE_BROWSER_QUEUE_ENABLED` unset for the demo unless the UI is updated to track queued browser proofs without an immediate transaction hash.
 
+Optional browser relay guard:
+
+```text
+AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true
+AIDTRACE_BROWSER_RELAY_RATE_LIMIT=30
+```
+
+Run `supabase/aidtrace_relay_guard.sql` before setting `AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true`. The guard stores browser event ids so retries do not create duplicate Celo writes, and rate-limits repeated browser relay attempts by IP + batch id + minute.
+
 Supabase queue setup:
 
 ```text
 Run supabase/aidtrace_queue.sql in the Supabase SQL editor before wiring queue-backed processing.
+Run supabase/aidtrace_relay_guard.sql in the Supabase SQL editor before enabling browser relay idempotency/rate limiting.
 Run supabase/aidtrace_timeline.sql in the Supabase SQL editor before using indexed timeline reads.
 ```
 
@@ -242,6 +254,14 @@ https://celoscan.io/address/0xaf5c40e82ac9255479a1f447e81992b71c4f4934#code
 ```
 
 Use the existing contract for new flows. Avoid redeploying just to add labels, parser words, or new off-chain metadata.
+
+Relayer recovery:
+
+```text
+scripts/relayer-rotation.md
+```
+
+Use the runbook if `RASTROAYUDA_RELAYER_PRIVATE_KEY` is exposed or if the hot key needs to be replaced. Keep `RastroAyuda_Admin` separate from the relayer key.
 
 ## Test Path
 

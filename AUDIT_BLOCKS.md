@@ -18,7 +18,8 @@ Status:
 
 ```text
 PARTIAL - implemented origin allowlist, browser relay payload validation, packet-size limit, duplicate detection inside one packet, generic browser relay errors, and optional webhook token support.
-Remaining - durable per-IP/per-batch rate limit and persistent idempotency should be implemented with the Supabase queue in Block 2.
+READY FOR SQL/ENV - durable browser relay idempotency and per-IP/per-batch rate limit are wired behind AIDTRACE_BROWSER_RELAY_GUARD_ENABLED using supabase/aidtrace_relay_guard.sql.
+Remaining - run the SQL, set AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true, deploy, then run duplicate and rate-limit smoke tests.
 ```
 
 Risk:
@@ -40,8 +41,8 @@ Required changes:
 ```text
 1. Split webhook traffic from browser relay traffic, or enforce separate auth rules per traffic type. DONE in api/zavu.mjs.
 2. Zavu webhook path: require a shared webhook secret or Zavu signature header before processing message.inbound. PARTIAL via optional AIDTRACE_WEBHOOK_TOKEN.
-3. Browser relay path: add abuse controls because a static browser cannot safely hold a secret. PARTIAL via origin allowlist and payload validation.
-   Minimum demo control: strict origin allowlist + payload validation + per-IP/per-batch rate limit. Rate limit remains pending.
+3. Browser relay path: add abuse controls because a static browser cannot safely hold a secret. READY FOR SQL/ENV via origin allowlist, payload validation, and optional Supabase guard.
+   Minimum demo control: strict origin allowlist + payload validation + per-IP/per-batch rate limit. Rate limit is ready behind AIDTRACE_BROWSER_RELAY_GUARD_ENABLED.
    Stronger control: queue first, approve/process server-side, then write to Celo.
 4. Add idempotency keys for browser packets so resubmits do not create duplicate on-chain writes.
 5. Return generic errors to callers; log detailed errors server-side only. DONE for browser relay item failures.
@@ -172,6 +173,13 @@ No single request should scan from deployment block unless explicitly reindexing
 
 ## Block 4 - Relayer Key Rotation And Blast Radius
 
+Status:
+
+```text
+PARTIAL - rotation and emergency revocation runbook added at scripts/relayer-rotation.md.
+Remaining - manual rotation drill should be done only when the operator is ready with a funded replacement relayer.
+```
+
 Risk:
 
 ```text
@@ -184,6 +192,7 @@ Current files:
 api/zavu.mjs
 AidTraceLedger.sol
 scripts/setup-zavu-relayer.ps1
+scripts/relayer-rotation.md
 ```
 
 Required changes:
@@ -191,7 +200,7 @@ Required changes:
 ```text
 1. Keep RastroAyuda_Admin separate from RASTROAYUDA_RELAYER_PRIVATE_KEY.
 2. Fund relayer with only enough CELO/fee currency for expected demo traffic.
-3. Document the rotation runbook:
+3. Document the rotation runbook: DONE in scripts/relayer-rotation.md.
    - create new relayer wallet
    - fund new relayer
    - admin calls setSubmitter(newRelayer, true)
@@ -410,17 +419,22 @@ Last verified: POST /api/process-queue?limit=3 processed three queued rows and r
 Follow-up verified: a second POST /api/process-queue?limit=3 returned processed=0, confirming the queue was empty after the burst.
 
 P0-04 - Browser relay idempotency
-Status: pending durable storage.
+Status: SQL/API ready; pending Supabase execution, env enablement, deploy verification.
 Why: static PWA retries can resend the same event.
-Files: api/zavu.mjs, Supabase queue table.
-Action: store browser event ids in the queue table with a unique key.
+Files: api/zavu.mjs, supabase/aidtrace_relay_guard.sql.
+Action: run supabase/aidtrace_relay_guard.sql in Supabase SQL editor.
+Action: set AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true only after the SQL is live.
+Action: resend the same browser relay packet twice.
 Acceptance: resending the same browser packet does not create duplicate Celo writes.
 
 P0-05 - Browser relay rate limit
-Status: pending durable storage or edge middleware.
+Status: SQL/API ready; pending Supabase execution, env enablement, deploy verification.
 Why: origin allowlists do not stop server-side callers from spending relayer funds.
-Files: api/zavu.mjs, Supabase queue table or Vercel/Upstash rate limiter.
-Action: rate limit by IP, batch id, and event count per minute.
+Files: api/zavu.mjs, supabase/aidtrace_relay_guard.sql.
+Env: AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true, AIDTRACE_BROWSER_RELAY_RATE_LIMIT=30.
+Action: run supabase/aidtrace_relay_guard.sql in Supabase SQL editor.
+Action: set AIDTRACE_BROWSER_RELAY_RATE_LIMIT to the desired per-IP/per-batch per-minute limit.
+Action: submit more than the configured limit for the same batch within one minute.
 Acceptance: repeated abusive relay requests are rejected before Celo writes.
 
 P1-01 - Timeline index table
@@ -439,9 +453,9 @@ Action: serve timeline from indexed table with limit/cursor.
 Acceptance: /api/timeline?limit=30 returns bounded data under target latency.
 
 P1-03 - Relayer key rotation drill
-Status: pending manual runbook test.
+Status: runbook ready; pending manual runbook test.
 Why: relayer is a hot key and must be revocable.
-Files: AidTraceLedger.sol, scripts/setup-zavu-relayer.ps1, Vercel envs.
+Files: AidTraceLedger.sol, scripts/setup-zavu-relayer.ps1, scripts/relayer-rotation.md, Vercel envs.
 Action: create a second relayer, grant submitter role, update Vercel, revoke old relayer.
 Acceptance: app writes with the new relayer and old relayer can no longer write.
 

@@ -43,6 +43,8 @@ const WEBHOOK_TOKEN = process.env.AIDTRACE_WEBHOOK_TOKEN || "";
 const MAX_BROWSER_RELAY_ITEMS = Number(process.env.AIDTRACE_MAX_BROWSER_RELAY_ITEMS || "20");
 const QUEUE_ENABLED = process.env.AIDTRACE_QUEUE_ENABLED === "true";
 const BROWSER_QUEUE_ENABLED = process.env.AIDTRACE_BROWSER_QUEUE_ENABLED === "true";
+const BROWSER_RELAY_GUARD_ENABLED = process.env.AIDTRACE_BROWSER_RELAY_GUARD_ENABLED === "true";
+const BROWSER_RELAY_RATE_LIMIT = Number(process.env.AIDTRACE_BROWSER_RELAY_RATE_LIMIT || "30");
 const QUEUE_WORKER_ID = process.env.AIDTRACE_QUEUE_WORKER_ID || "aidtrace-vercel-worker";
 let celoWriteQueue = Promise.resolve();
 
@@ -68,6 +70,17 @@ const zavu = new Zavudev({
 
 function requestOrigin(req) {
   return String(req.headers.origin || "");
+}
+
+function requestIp(req) {
+  const forwardedFor = String(req.headers["x-forwarded-for"] || "");
+  const forwardedIp = forwardedFor.split(",")[0]?.trim();
+  return (
+    forwardedIp ||
+    String(req.headers["x-real-ip"] || "") ||
+    String(req.socket?.remoteAddress || "") ||
+    "unknown"
+  );
 }
 
 function isAllowedOrigin(origin) {
@@ -187,6 +200,38 @@ async function supabaseRpc(name, payload) {
 
 function hasSupabaseQueue() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+function hasBrowserRelayGuard() {
+  return Boolean(BROWSER_RELAY_GUARD_ENABLED && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+async function beginBrowserRelayEvent(item, requesterIp) {
+  const rows = await supabaseRpc("begin_aidtrace_browser_relay_event", {
+    p_event_id: item.id,
+    p_batch_id: String(item.batchId || "").toUpperCase(),
+    p_action_type: String(item.actionType || "").toUpperCase(),
+    p_requester_ip: requesterIp,
+    p_rate_limit: BROWSER_RELAY_RATE_LIMIT,
+  });
+
+  return Array.isArray(rows) ? rows[0] || null : rows;
+}
+
+async function completeBrowserRelayEvent(eventId, txHash) {
+  if (!eventId) return null;
+  return supabaseRpc("complete_aidtrace_browser_relay_event", {
+    p_event_id: eventId,
+    p_tx_hash: txHash,
+  });
+}
+
+async function failBrowserRelayEvent(eventId, error) {
+  if (!eventId) return null;
+  return supabaseRpc("fail_aidtrace_browser_relay_event", {
+    p_event_id: eventId,
+    p_error: String(error?.message || error || "unknown error"),
+  });
 }
 
 async function enqueueAidTraceMessage({ inboundMessageId, source, channel, recipient, parsed, payload }) {
@@ -559,7 +604,7 @@ function relayEventToParsed(event) {
   };
 }
 
-async function handleBrowserRelay(packet, res) {
+async function handleBrowserRelay(packet, req, res) {
   try {
     validateBrowserRelayPacket(packet);
   } catch (error) {
@@ -571,10 +616,48 @@ async function handleBrowserRelay(packet, res) {
   const recorded = [];
   const failed = [];
   const queued = [];
+  const requesterIp = requestIp(req);
+  const relayGuardEnabled = hasBrowserRelayGuard();
 
   for (const item of pending) {
+    let guardStarted = false;
     try {
       const parsed = relayEventToParsed(item);
+      if (relayGuardEnabled) {
+        const guard = await beginBrowserRelayEvent(item, requesterIp);
+        if (guard?.duplicate) {
+          if (guard.tx_hash) {
+            recorded.push({
+              id: item.id,
+              batchId: parsed.batchId,
+              actionType: parsed.actionType,
+              txHash: guard.tx_hash,
+              duplicate: true,
+            });
+          } else {
+            queued.push({
+              id: item.id,
+              batchId: parsed.batchId,
+              actionType: parsed.actionType,
+              duplicate: true,
+            });
+          }
+          continue;
+        }
+
+        if (guard?.rate_limited) {
+          failed.push({
+            id: item.id,
+            batchId: parsed.batchId,
+            actionType: parsed.actionType,
+            error: "Relay rate limit exceeded",
+          });
+          continue;
+        }
+
+        guardStarted = Boolean(guard?.accepted);
+      }
+
       if (QUEUE_ENABLED && BROWSER_QUEUE_ENABLED) {
         const messageId = item.id || randomUUID();
         const queueId = await enqueueAidTraceMessage({
@@ -633,8 +716,19 @@ async function handleBrowserRelay(packet, res) {
         actionType: parsed.actionType,
         txHash: result.txHash,
       });
+
+      if (guardStarted) {
+        await completeBrowserRelayEvent(item.id, result.txHash);
+      }
     } catch (error) {
       console.error("Browser relay item failed:", item?.id, error);
+      if (guardStarted) {
+        try {
+          await failBrowserRelayEvent(item.id, error);
+        } catch (guardError) {
+          console.error("Browser relay guard fail update failed:", item?.id, guardError);
+        }
+      }
       failed.push({
         id: item?.id,
         batchId: item?.batchId,
@@ -737,7 +831,7 @@ export default async function handler(req, res) {
       if (!isAllowedOrigin(requestOrigin(req))) {
         return res.status(403).json({ ok: false, error: "Origin not allowed" });
       }
-      return handleBrowserRelay(event, res);
+      return handleBrowserRelay(event, req, res);
     }
 
     if (event.type !== "message.inbound") {
