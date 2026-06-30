@@ -149,6 +149,7 @@ api/timeline.mjs            Celo timeline reader with Supabase index fallback
 AidTraceLedger.sol          On-chain proof ledger
 scripts/send-zavu-message.mjs Outbound channel smoke test
 scripts/relayer-rotation.md Relayer key rotation and emergency revocation runbook
+scripts/final-demo-check.ps1 Final local + deployed endpoint smoke checks
 supabase/aidtrace_queue.sql Supabase durable queue table and RPCs for serialized Celo writes
 supabase/aidtrace_relay_guard.sql Supabase browser relay idempotency and per-minute abuse guard
 supabase/aidtrace_timeline.sql Supabase indexed timeline cache for bounded reads
@@ -173,6 +174,7 @@ Local verification:
 ```powershell
 npm.cmd run test
 npm.cmd run check
+.\scripts\final-demo-check.ps1 -SkipRemote
 ```
 
 Required Vercel envs:
@@ -284,6 +286,14 @@ Use the runbook if `RASTROAYUDA_RELAYER_PRIVATE_KEY` is exposed or if the hot ke
 9. Confirm the event appears in the app timeline.
 10. Call `/api/timeline?limit=30` twice and confirm the second call returns from the indexed cache without a full historical scan.
 11. If `pagination.nextCursor` is present, call `/api/timeline?limit=30&cursor=<nextCursor>` to inspect the next page.
+
+Final deployed smoke check:
+
+```powershell
+.\scripts\final-demo-check.ps1 `
+  -BaseUrl "https://aidtrace-rastroayuda.vercel.app" `
+  -Origin "https://aidtrace-rastroayuda.vercel.app"
+```
 
 ## Notes
 
