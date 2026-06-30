@@ -115,8 +115,9 @@ async function supabaseRequest(path, options = {}) {
     throw new Error(`Supabase timeline error: ${response.status} ${text}`);
   }
 
-  if (response.status === 204) return null;
-  return response.json();
+  const text = await response.text();
+  if (!text.trim()) return null;
+  return JSON.parse(text);
 }
 
 async function getIndexedState(defaultFromBlock) {
