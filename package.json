@@ -1,4 +1,8 @@
 {
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check api/zavu.mjs && node --check api/process-queue.mjs && node --check api/timeline.mjs && node --check app.js"
+  },
   "dependencies": {
     "@zavudev/sdk": "^0.46.0",
     "express": "^5.2.1",

@@ -17,9 +17,8 @@ P2: complete PWA installability assets
 Status:
 
 ```text
-PARTIAL - implemented origin allowlist, browser relay payload validation, packet-size limit, duplicate detection inside one packet, generic browser relay errors, and optional webhook token support.
-READY FOR SQL/ENV - durable browser relay idempotency and per-IP/per-batch rate limit are wired behind AIDTRACE_BROWSER_RELAY_GUARD_ENABLED using supabase/aidtrace_relay_guard.sql.
-Remaining - run the SQL, set AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true, deploy, then run duplicate and rate-limit smoke tests.
+PASSED FOR BROWSER RELAY - implemented origin allowlist, browser relay payload validation, packet-size limit, duplicate detection inside one packet, generic browser relay errors, optional webhook token support, durable idempotency, and per-IP/per-batch rate limit.
+Remaining - Zavu webhook token is still pending operator setup.
 ```
 
 Risk:
@@ -41,8 +40,8 @@ Required changes:
 ```text
 1. Split webhook traffic from browser relay traffic, or enforce separate auth rules per traffic type. DONE in api/zavu.mjs.
 2. Zavu webhook path: require a shared webhook secret or Zavu signature header before processing message.inbound. PARTIAL via optional AIDTRACE_WEBHOOK_TOKEN.
-3. Browser relay path: add abuse controls because a static browser cannot safely hold a secret. READY FOR SQL/ENV via origin allowlist, payload validation, and optional Supabase guard.
-   Minimum demo control: strict origin allowlist + payload validation + per-IP/per-batch rate limit. Rate limit is ready behind AIDTRACE_BROWSER_RELAY_GUARD_ENABLED.
+3. Browser relay path: add abuse controls because a static browser cannot safely hold a secret. PASSED via origin allowlist, payload validation, persistent idempotency, and Supabase rate limit guard.
+   Minimum demo control: strict origin allowlist + payload validation + per-IP/per-batch rate limit. PASSED.
    Stronger control: queue first, approve/process server-side, then write to Celo.
 4. Add idempotency keys for browser packets so resubmits do not create duplicate on-chain writes.
 5. Return generic errors to callers; log detailed errors server-side only. DONE for browser relay item failures.
@@ -220,6 +219,12 @@ Confirm app still writes after switching to new relayer key.
 
 ## Block 5 - CORS And Endpoint Surface
 
+Status:
+
+```text
+READY FOR DEPLOY VERIFICATION - /api/zavu and /api/timeline both use AIDTRACE_ALLOWED_ORIGINS. Direct GET access to /api/timeline still works when no Origin header is present.
+```
+
 Risk:
 
 ```text
@@ -237,7 +242,7 @@ Required changes:
 
 ```text
 1. For /api/zavu, allow only configured origins and expected headers.
-2. For /api/timeline, wildcard can remain if it is read-only and rate-limited, but prefer allowlist for app demo.
+2. For /api/timeline, wildcard can remain if it is read-only and rate-limited, but prefer allowlist for app demo. DONE in api/timeline.mjs.
 3. Add AIDTRACE_ALLOWED_ORIGINS=https://aidtrace-rastroayuda.vercel.app,http://127.0.0.1:8017.
 4. Reject unexpected methods and content types before reading body.
 ```
@@ -251,6 +256,12 @@ OPTIONS response returns only allowed methods/headers.
 ```
 
 ## Block 6 - Tests And CI
+
+Status:
+
+```text
+READY FOR PUSH VERIFICATION - parser helpers and timeline parser helpers were extracted, Node tests were added, local npm test/check scripts are ready, and GitHub Actions workflow is present.
+```
 
 Risk:
 
@@ -270,17 +281,17 @@ package.json
 Required changes:
 
 ```text
-1. Extract parser helpers from api/zavu.mjs into a testable module.
+1. Extract parser helpers from api/zavu.mjs into a testable module. DONE in api/aidtrace-parser.mjs.
 2. Add unit tests for:
    - CELO1 / LOTE 1 / AT-CELO-1 batch parsing
    - depositar/entregar/recoger/revisar aliases
    - details extraction with numbers
-   - duplicate message id handling
-3. Add a timeline parser test for bytes32 and referenceURI.
+   - duplicate message id handling. PARTIAL; parser behavior covered, queue idempotency covered manually.
+3. Add a timeline parser test for bytes32 and referenceURI. DONE.
 4. Add npm scripts:
    - npm run test
-   - npm run lint or npm run check
-5. Add GitHub Actions workflow for node install + test.
+   - npm run lint or npm run check. DONE with npm run check.
+5. Add GitHub Actions workflow for node install + test. DONE in .github/workflows/ci.yml.
 ```
 
 Acceptance checks:
@@ -419,16 +430,17 @@ Last verified: POST /api/process-queue?limit=3 processed three queued rows and r
 Follow-up verified: a second POST /api/process-queue?limit=3 returned processed=0, confirming the queue was empty after the burst.
 
 P0-04 - Browser relay idempotency
-Status: SQL/API ready; pending Supabase execution, env enablement, deploy verification.
+Status: passed in deployed smoke test.
 Why: static PWA retries can resend the same event.
 Files: api/zavu.mjs, supabase/aidtrace_relay_guard.sql.
 Action: run supabase/aidtrace_relay_guard.sql in Supabase SQL editor.
 Action: set AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true only after the SQL is live.
 Action: resend the same browser relay packet twice.
 Acceptance: resending the same browser packet does not create duplicate Celo writes.
+Last verified: duplicate browser packet returned the same txHash for id manual-dupe-ecbfd359-8391-4d51-b55b-67b1ade903b6.
 
 P0-05 - Browser relay rate limit
-Status: SQL/API ready; pending Supabase execution, env enablement, deploy verification.
+Status: passed in deployed smoke test.
 Why: origin allowlists do not stop server-side callers from spending relayer funds.
 Files: api/zavu.mjs, supabase/aidtrace_relay_guard.sql.
 Env: AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true, AIDTRACE_BROWSER_RELAY_RATE_LIMIT=30.
@@ -436,6 +448,7 @@ Action: run supabase/aidtrace_relay_guard.sql in Supabase SQL editor.
 Action: set AIDTRACE_BROWSER_RELAY_RATE_LIMIT to the desired per-IP/per-batch per-minute limit.
 Action: submit more than the configured limit for the same batch within one minute.
 Acceptance: repeated abusive relay requests are rejected before Celo writes.
+Last verified: browser relay returned "Relay rate limit exceeded" for id manual-rate-a8866522-7474-4108-96ad-4bbfed9e961b before recording.
 
 P1-01 - Timeline index table
 Status: SQL/API ready; pending Supabase execution and deploy verification.
@@ -460,32 +473,38 @@ Action: create a second relayer, grant submitter role, update Vercel, revoke old
 Acceptance: app writes with the new relayer and old relayer can no longer write.
 
 P1-04 - Timeline endpoint CORS policy
-Status: pending decision.
+Status: code ready; pending deploy verification.
 Why: read-only wildcard CORS is lower risk, but allowlist is cleaner for demo review.
 Files: api/timeline.mjs.
-Action: either document wildcard as intentional public read API or apply AIDTRACE_ALLOWED_ORIGINS.
+Action: deploy api/timeline.mjs with AIDTRACE_ALLOWED_ORIGINS.
+Action: open /api/timeline directly in the browser and confirm it still returns JSON.
+Action: send OPTIONS/GET from an unknown Origin and confirm rejection.
 Acceptance: reviewer can explain why timeline CORS is public or restricted.
 
 P2-01 - Parser unit tests
-Status: pending.
+Status: complete for core parser behavior.
 Why: Telegram natural language parsing is core demo behavior.
-Files: api/zavu.mjs or extracted parser module, package.json.
-Action: extract parser helpers from api/zavu.mjs.
-Action: test CELO1, LOTE 1, AT-CELO-1, depositar, entregar, recoger, revisar.
+Files: api/aidtrace-parser.mjs, api/zavu.mjs, test/aidtrace-parser.test.mjs, package.json.
+Action: extract parser helpers from api/zavu.mjs. DONE.
+Action: test CELO1, LOTE 1, AT-CELO-1, depositar, entregar, recoger, revisar. DONE.
 Acceptance: parser regression fails locally.
+Last verified: npm run test passed 7 parser tests.
 
 P2-02 - Timeline parser tests
-Status: pending.
+Status: complete for parser behavior.
 Why: audit details depend on bytes32 and referenceURI parsing.
-Files: api/timeline.mjs or extracted timeline parser module.
-Action: test bytes32ToText and parseReferenceURI.
+Files: api/timeline-parser.mjs, api/timeline.mjs, test/timeline-parser.test.mjs.
+Action: test bytes32ToText and parseReferenceURI. DONE.
 Acceptance: malformed or changed referenceURI behavior is caught.
+Last verified: npm run test passed 11 total parser and timeline parser tests.
 
 P2-03 - CI pipeline
-Status: pending.
+Status: workflow ready; pending GitHub run after push.
 Why: no automated check protects the hackathon demo from regressions.
 Files: .github/workflows/ci.yml, package.json.
-Action: run npm install and npm test or node --check commands.
+Action: run npm install and npm test or node --check commands. DONE locally via npm run test and npm.cmd run check.
+Action: add .github/workflows/ci.yml. DONE.
+Action: push to GitHub and confirm the workflow passes. PENDING.
 Acceptance: GitHub Actions fails on syntax or parser regression.
 
 P2-04 - PWA icons

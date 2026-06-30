@@ -167,6 +167,13 @@ Local static preview:
 npx serve .
 ```
 
+Local verification:
+
+```powershell
+npm.cmd run test
+npm.cmd run check
+```
+
 Required Vercel envs:
 
 ```text
