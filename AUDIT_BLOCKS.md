@@ -382,13 +382,14 @@ Execution order:
 4. P2-01, P2-02, P2-03, P2-04, P2-05
 
 P0-00 - Deploy current relay hardening changes
-Status: fixed locally; pending deploy.
+Status: passed after deploy.
 Why: local code now has stricter CORS, relay validation, generic browser errors, and optional webhook token support.
 Files: api/zavu.mjs, README.md, AUDIT_BLOCKS.md, test/zavu-handler.test.mjs.
 Action: review diff, push to GitHub manually, and let Vercel deploy.
 Acceptance: deployed /api/zavu still accepts valid browser relay from the app origin and valid Telegram webhook events.
 Issue: addresses GitHub issue #1 by rejecting empty/unsupported /api/zavu POSTs, enforcing browser Origin checks before body handling, documenting webhook-token limitations, and adding relay regression tests.
 Last verified locally: npm.cmd run test passed 14 tests; npm.cmd run check passed.
+Last verified deployed: final-demo-check.ps1 passed.
 
 P0-01 - AIDTRACE_WEBHOOK_TOKEN
 Status: PARTIAL - header probe shows current Zavu webhook does not attach custom headers; keep env unset unless a Zavu Function/proxy is added.
@@ -403,15 +404,16 @@ Rollback: remove AIDTRACE_WEBHOOK_TOKEN from Vercel and redeploy if Telegram inb
 Acceptance: Telegram message records on Celo with AIDTRACE_WEBHOOK_TOKEN unset today, or with token enabled only after a header-capable proxy is live.
 
 P0-06 - AIDTRACE_ALLOWED_ORIGINS
-Status: PARTIAL - deployed timeline allowlist verified manually; /api/zavu deploy verification still pending after latest issue #1 patch.
+Status: passed after deploy.
 Why: /api/zavu now only sets CORS for allowed browser origins and rejects browser relay requests from unknown origins.
 Env: AIDTRACE_ALLOWED_ORIGINS.
 Required value: https://aidtrace-rastroayuda.vercel.app,http://127.0.0.1:8017,http://localhost:8017
 Action: set the env in Vercel before or with the hardening deploy.
 Acceptance: browser app sync works from production; unknown Origin relay request is rejected.
+Last verified deployed: final-demo-check.ps1 passed timeline CORS allowlist, timeline CORS rejection, and bad-origin relay rejection.
 
 P0-07 - Relay hardening smoke tests
-Status: PARTIAL - final-demo-check.ps1 updated to use curl.exe for CORS probes; browser relay and Telegram smoke tests still pending after deploy.
+Status: passed after deploy for automated smoke checks; manual browser offline and Telegram walkthrough remain part of final demo verification.
 Why: confirms Block 1 did not break the demo path.
 Files: api/zavu.mjs, app.js, scripts/final-demo-check.ps1, test/zavu-handler.test.mjs.
 Action: submit one browser offline proof and let it sync.
@@ -419,7 +421,7 @@ Action: send one Telegram message through Zavu.
 Action: send a relay request from an unknown Origin and confirm rejection.
 Acceptance: valid app and Telegram paths work; unknown Origin does not write to Celo.
 Local regression: empty /api/zavu POST returns 400; unknown-origin browser relay returns 403 before body handling.
-Deploy note: production returned 500 for the bad-origin relay before the early-origin guard was added; rerun final-demo-check.ps1 after deploying this patch.
+Deploy note: production returned 500 for the bad-origin relay before the early-origin guard was added; final-demo-check.ps1 passed after deploy.
 
 P0-02 - Supabase durable queue table
 Status: SQL executed; worker smoke test reached Supabase.
@@ -464,20 +466,22 @@ Acceptance: repeated abusive relay requests are rejected before Celo writes.
 Last verified: browser relay returned "Relay rate limit exceeded" for id manual-rate-a8866522-7474-4108-96ad-4bbfed9e961b before recording.
 
 P1-01 - Timeline index table
-Status: SQL/API ready; pending Supabase execution and deploy verification.
+Status: passed after deploy.
 Why: /api/timeline currently scans historical logs from deployment block.
 Files: api/timeline.mjs, supabase/aidtrace_timeline.sql, Supabase SQL editor.
 Action: cache contract logs into Supabase.
 Action: track last_indexed_block per contract.
 Acceptance: /api/timeline does not rescan from deployment block on every request.
+Last verified deployed: /api/timeline?limit=30 returned indexed=true with index.lastIndexedBlock matching latestBlock.
 
 P1-02 - Timeline pagination from indexed data
-Status: code ready; pending deploy verification.
+Status: passed after deploy.
 Why: timeline should stay fast after hundreds or thousands of events.
 Files: api/timeline.mjs, app.js.
 Action: serve timeline from indexed table with limit/cursor. DONE in api/timeline.mjs.
 Action: deploy and call /api/timeline?limit=30; if pagination.nextCursor is present, call /api/timeline?limit=30&cursor=<nextCursor>.
 Acceptance: /api/timeline?limit=30 returns bounded data under target latency.
+Last verified deployed: /api/timeline?limit=30 returned pagination.nextCursor=30 and final-demo-check.ps1 verified the cursor page returns ok=true.
 
 P1-03 - Relayer key rotation drill
 Status: runbook ready; pending manual runbook test.
@@ -487,13 +491,14 @@ Action: create a second relayer, grant submitter role, update Vercel, revoke old
 Acceptance: app writes with the new relayer and old relayer can no longer write.
 
 P1-04 - Timeline endpoint CORS policy
-Status: code ready; pending deploy verification.
+Status: passed after deploy.
 Why: read-only wildcard CORS is lower risk, but allowlist is cleaner for demo review.
 Files: api/timeline.mjs.
 Action: deploy api/timeline.mjs with AIDTRACE_ALLOWED_ORIGINS.
 Action: open /api/timeline directly in the browser and confirm it still returns JSON.
 Action: send OPTIONS/GET from an unknown Origin and confirm rejection.
 Acceptance: reviewer can explain why timeline CORS is public or restricted.
+Last verified deployed: final-demo-check.ps1 passed direct JSON, allowed Origin OPTIONS, and unknown Origin rejection.
 
 P2-01 - Parser unit tests
 Status: complete for core parser behavior.
@@ -530,11 +535,12 @@ Action: bump service worker cache after adding icon assets. DONE.
 Acceptance: browser Application > Manifest shows no icon warnings.
 
 P2-05 - Final demo verification
-Status: script ready; pending deployed smoke test and manual browser/Telegram walkthrough.
+Status: automated deployed smoke passed; manual browser/Telegram walkthrough still pending.
 Why: confirms the whole story still works after audit hardening.
 Files: app, api/zavu.mjs, api/timeline.mjs, scripts/final-demo-check.ps1.
 Action: run Block 8 Demo Diff Review. SCRIPT READY.
 Action: run .\scripts\final-demo-check.ps1 -BaseUrl "https://aidtrace-rastroayuda.vercel.app" -Origin "https://aidtrace-rastroayuda.vercel.app" after deploy.
 Action: manually verify browser offline path, Telegram path, Timeline, and Celoscan Logs.
 Acceptance: browser offline path, Telegram path, Celo tx link, Timeline, and Celoscan Logs all pass.
+Last verified deployed: final-demo-check.ps1 passed.
 ```
