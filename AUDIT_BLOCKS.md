@@ -527,12 +527,13 @@ Action: push to GitHub and confirm the workflow passes. PENDING.
 Acceptance: GitHub Actions fails on syntax or parser regression.
 
 P2-04 - PWA icons
-Status: code ready; pending browser manifest verification after deploy.
+Status: passed after deploy.
 Why: manifest.webmanifest has an empty icons array.
 Files: manifest.webmanifest, sw.js, assets/icons/icon-192.png, assets/icons/icon-512.png, assets/icons/icon-maskable-512.png.
 Action: add 192x192 and 512x512 PNG icons, preferably maskable. DONE.
 Action: bump service worker cache after adding icon assets. DONE.
 Acceptance: browser Application > Manifest shows no icon warnings.
+Last verified deployed: manifest includes 192, 512, and maskable 512 PNG icons; all icon asset URLs returned 200 OK as image/png.
 
 P2-05 - Final demo verification
 Status: automated deployed smoke passed; manual browser/Telegram walkthrough still pending.
