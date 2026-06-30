@@ -28,6 +28,22 @@ const SUPABASE_LOCK_ACQUIRE_RPC = process.env.AIDTRACE_SUPABASE_LOCK_ACQUIRE_RPC
 const SUPABASE_LOCK_RELEASE_RPC = process.env.AIDTRACE_SUPABASE_LOCK_RELEASE_RPC || "release_aidtrace_lock";
 const REDIS_REST_URL = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "";
 const REDIS_REST_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "";
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://aidtrace-rastroayuda.vercel.app",
+  "http://127.0.0.1:8017",
+  "http://localhost:8017",
+];
+const ALLOWED_ORIGINS = new Set(
+  (process.env.AIDTRACE_ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(","))
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+const WEBHOOK_TOKEN = process.env.AIDTRACE_WEBHOOK_TOKEN || "";
+const MAX_BROWSER_RELAY_ITEMS = Number(process.env.AIDTRACE_MAX_BROWSER_RELAY_ITEMS || "20");
+const QUEUE_ENABLED = process.env.AIDTRACE_QUEUE_ENABLED === "true";
+const BROWSER_QUEUE_ENABLED = process.env.AIDTRACE_BROWSER_QUEUE_ENABLED === "true";
+const QUEUE_WORKER_ID = process.env.AIDTRACE_QUEUE_WORKER_ID || "aidtrace-vercel-worker";
 let celoWriteQueue = Promise.resolve();
 
 const abi = [
@@ -50,14 +66,90 @@ const zavu = new Zavudev({
   apiKey: process.env.RASTROAYUDA_ZAVU_API_KEY,
 });
 
-function setCors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+function requestOrigin(req) {
+  return String(req.headers.origin || "");
+}
+
+function isAllowedOrigin(origin) {
+  return Boolean(origin && ALLOWED_ORIGINS.has(origin));
+}
+
+function setCors(req, res) {
+  const origin = requestOrigin(req);
+  if (isAllowedOrigin(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-AidTrace-Webhook-Token");
 }
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function hasValidWebhookToken(req) {
+  if (!WEBHOOK_TOKEN) return true;
+
+  const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  const explicit = String(req.headers["x-aidtrace-webhook-token"] || "");
+  return bearer === WEBHOOK_TOKEN || explicit === WEBHOOK_TOKEN;
+}
+
+function validateTextField(value, label, maxLength) {
+  if (value == null) return;
+  if (typeof value !== "string" || value.length > maxLength) {
+    throw new Error(`Invalid ${label}`);
+  }
+}
+
+function validateBrowserRelayPacket(packet) {
+  if (!Array.isArray(packet.pending)) {
+    throw new Error("Relay packet missing pending array");
+  }
+
+  if (packet.pending.length > MAX_BROWSER_RELAY_ITEMS) {
+    throw new Error(`Relay packet too large. Max ${MAX_BROWSER_RELAY_ITEMS} events.`);
+  }
+
+  const seen = new Set();
+  const allowedActions = new Set([
+    "CREATED",
+    "PICKED_UP",
+    "ARRIVED",
+    "DELIVERED",
+    "DAMAGED",
+    "NEEDS_REVIEW",
+    "SMS_CONFIRMED",
+  ]);
+
+  for (const item of packet.pending) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("Invalid relay item");
+    }
+
+    validateTextField(item.id, "id", 120);
+    validateTextField(item.batchId, "batchId", 64);
+    validateTextField(item.actionType, "actionType", 40);
+    validateTextField(item.senderName, "senderName", 120);
+    validateTextField(item.locationText, "locationText", 160);
+    validateTextField(item.note, "note", 500);
+    validateTextField(item.ref, "ref", 300);
+
+    if (!/^AT-[A-Z0-9-_]{1,56}$/i.test(item.batchId || "")) {
+      throw new Error("Invalid batchId");
+    }
+
+    if (!allowedActions.has(String(item.actionType || "").toUpperCase())) {
+      throw new Error("Invalid actionType");
+    }
+
+    const duplicateKey = item.id || `${item.batchId}:${item.actionType}:${item.note || item.locationText || ""}`;
+    if (seen.has(duplicateKey)) {
+      throw new Error("Duplicate relay item in packet");
+    }
+    seen.add(duplicateKey);
+  }
 }
 
 function hasDistributedLock() {
@@ -86,11 +178,57 @@ async function supabaseRpc(name, payload) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Supabase lock error: ${response.status} ${text}`);
+    throw new Error(`Supabase RPC error: ${response.status} ${text}`);
   }
 
   if (response.status === 204) return null;
   return response.json();
+}
+
+function hasSupabaseQueue() {
+  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+}
+
+async function enqueueAidTraceMessage({ inboundMessageId, source, channel, recipient, parsed, payload }) {
+  if (!hasSupabaseQueue()) {
+    throw new Error("Missing Supabase queue configuration");
+  }
+
+  return supabaseRpc("enqueue_aidtrace_message", {
+    p_inbound_message_id: inboundMessageId,
+    p_source: source,
+    p_channel: channel,
+    p_recipient: recipient || null,
+    p_batch_id: parsed?.batchId || null,
+    p_action_type: parsed?.actionType || null,
+    p_details: parsed?.details || null,
+    p_payload: payload || {},
+  });
+}
+
+export async function claimAidTraceMessage(workerId = QUEUE_WORKER_ID) {
+  const rows = await supabaseRpc("claim_aidtrace_message", {
+    p_worker_id: workerId,
+    p_lock_seconds: Number(process.env.AIDTRACE_QUEUE_LOCK_SECONDS || "120"),
+  });
+
+  return Array.isArray(rows) ? rows[0] || null : rows;
+}
+
+export async function completeAidTraceMessage(id, txHash) {
+  return supabaseRpc("complete_aidtrace_message", {
+    p_id: id,
+    p_tx_hash: txHash,
+  });
+}
+
+export async function retryAidTraceMessage(id, error, retrySeconds = 30) {
+  return supabaseRpc("retry_aidtrace_message", {
+    p_id: id,
+    p_error: String(error?.message || error || "unknown error"),
+    p_retry_seconds: retrySeconds,
+    p_max_attempts: Number(process.env.AIDTRACE_QUEUE_MAX_ATTEMPTS || "8"),
+  });
 }
 
 async function tryAcquireSupabaseLock(lockValue) {
@@ -349,7 +487,7 @@ function buildReferenceURI(source, messageId, parsed, explicitReferenceURI) {
   return `${base} | ${parsed.actionType} ${parsed.batchId} | ${publicAuditText(parsed.details)}`;
 }
 
-async function recordOnCelo(event, data, parsed, options = {}) {
+export async function recordOnCelo(event, data, parsed, options = {}) {
   const privateKey = process.env.RASTROAYUDA_RELAYER_PRIVATE_KEY;
   const messageId = options.messageId || getMessageId(event, data);
   const source = options.source || "zavu";
@@ -422,13 +560,55 @@ function relayEventToParsed(event) {
 }
 
 async function handleBrowserRelay(packet, res) {
+  try {
+    validateBrowserRelayPacket(packet);
+  } catch (error) {
+    console.error("Invalid browser relay packet:", error);
+    return res.status(400).json({ ok: false, error: "Invalid relay packet" });
+  }
+
   const pending = Array.isArray(packet.pending) ? packet.pending : [];
   const recorded = [];
   const failed = [];
+  const queued = [];
 
   for (const item of pending) {
     try {
       const parsed = relayEventToParsed(item);
+      if (QUEUE_ENABLED && BROWSER_QUEUE_ENABLED) {
+        const messageId = item.id || randomUUID();
+        const queueId = await enqueueAidTraceMessage({
+          inboundMessageId: `browser:${messageId}`,
+          source: "browser",
+          channel: "browser",
+          recipient: null,
+          parsed,
+          payload: {
+            event: { id: messageId },
+            data: {
+              channel: "browser",
+              from: item.senderName || "AidTrace browser",
+              messageId,
+            },
+            parsed,
+            options: {
+              source: "browser",
+              messageId,
+              referenceURI: item.ref || `aidtrace:${parsed.batchId}`,
+              extraData: item,
+            },
+          },
+        });
+
+        queued.push({
+          id: item.id,
+          queueId,
+          batchId: parsed.batchId,
+          actionType: parsed.actionType,
+        });
+        continue;
+      }
+
       const result = await enqueueCeloWrite(() =>
         recordOnCelo(
           { id: item.id || randomUUID() },
@@ -459,19 +639,20 @@ async function handleBrowserRelay(packet, res) {
         id: item?.id,
         batchId: item?.batchId,
         actionType: item?.actionType,
-        error: error.message || "Relay item failed",
+        error: "Relay item failed",
       });
     }
   }
 
   return res.status(failed.length ? 207 : 200).json({
     ok: failed.length === 0,
+    queued,
     recorded,
     failed,
   });
 }
 
-function buildSuccessReply(parsed, txHash) {
+export function buildSuccessReply(parsed, txHash) {
   return [
     `Registrado en Celo: ${parsed.actionType} ${parsed.batchId}`,
     `Detalles: ${parsed.details}`,
@@ -480,10 +661,66 @@ function buildSuccessReply(parsed, txHash) {
   ].join("\n");
 }
 
+export async function processQueuedAidTraceMessage(workerId = QUEUE_WORKER_ID) {
+  const row = await claimAidTraceMessage(workerId);
+  if (!row) return { ok: true, processed: false };
+
+  try {
+    const payload = row.payload || {};
+    const parsed = payload.parsed || {
+      actionType: row.action_type,
+      batchId: row.batch_id,
+      details: row.details || "sin detalles",
+    };
+    const data = payload.data || {
+      channel: row.channel,
+      from: row.recipient,
+      messageId: row.inbound_message_id,
+    };
+    const event = payload.event || { id: row.inbound_message_id };
+    const options = payload.options || {
+      source: row.source,
+      messageId: row.inbound_message_id,
+    };
+
+    const result = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed, options));
+    await completeAidTraceMessage(row.id, result.txHash);
+
+    if (payload.replyTo && payload.replyChannel) {
+      await zavu.messages.send({
+        to: payload.replyTo,
+        channel: payload.replyChannel,
+        text: buildSuccessReply(parsed, result.txHash),
+        idempotencyKey: `aidtrace-final-${row.inbound_message_id}`,
+      });
+    }
+
+    return {
+      ok: true,
+      processed: true,
+      id: row.id,
+      txHash: result.txHash,
+    };
+  } catch (error) {
+    console.error("Queued AidTrace message failed:", row.id, error);
+    await retryAidTraceMessage(row.id, error);
+    return {
+      ok: false,
+      processed: true,
+      id: row.id,
+      error: "Queued message failed",
+    };
+  }
+}
+
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(req, res);
 
   if (req.method === "OPTIONS") {
+    const origin = requestOrigin(req);
+    if (origin && !isAllowedOrigin(origin)) {
+      return res.status(403).send("Origin not allowed");
+    }
     return res.status(204).end();
   }
 
@@ -497,11 +734,18 @@ export default async function handler(req, res) {
     console.log("Zavu event:", JSON.stringify(event, null, 2));
 
     if (event.schema === "aidtrace.relay.v1") {
+      if (!isAllowedOrigin(requestOrigin(req))) {
+        return res.status(403).json({ ok: false, error: "Origin not allowed" });
+      }
       return handleBrowserRelay(event, res);
     }
 
     if (event.type !== "message.inbound") {
       return res.status(200).send("Ignored");
+    }
+
+    if (!hasValidWebhookToken(req)) {
+      return res.status(401).send("Unauthorized");
     }
 
     const data = event.data || {};
@@ -518,9 +762,38 @@ export default async function handler(req, res) {
 
     try {
       parsed = parseAidTraceText(data.text);
-      const { messageId, txHash } = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed));
-      replyText = buildSuccessReply(parsed, txHash);
-      idempotencyKey = `aidtrace-reply-${messageId}`;
+      const messageId = getMessageId(event, data);
+
+      if (QUEUE_ENABLED) {
+        await enqueueAidTraceMessage({
+          inboundMessageId: `zavu:${messageId}`,
+          source: "zavu",
+          channel,
+          recipient: to,
+          parsed,
+          payload: {
+            event,
+            data,
+            parsed,
+            options: {
+              source: "zavu",
+              messageId,
+            },
+            replyTo: to,
+            replyChannel: channel,
+          },
+        });
+        replyText = [
+          `Recibido en cola: ${parsed.actionType} ${parsed.batchId}`,
+          `Detalles: ${parsed.details}`,
+          "AidTrace lo registrara en Celo y enviara el link de auditoria.",
+        ].join("\n");
+        idempotencyKey = `aidtrace-queued-${messageId}`;
+      } else {
+        const { messageId, txHash } = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed));
+        replyText = buildSuccessReply(parsed, txHash);
+        idempotencyKey = `aidtrace-reply-${messageId}`;
+      }
     } catch (error) {
       replyText = error.message || "No se pudo registrar el evento.";
       idempotencyKey = `aidtrace-error-${getMessageId(event, data)}`;

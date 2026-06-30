@@ -143,18 +143,83 @@ app.js                      PWA state, offline queue, QR/PDF, timeline rendering
 sw.js                       Service worker cache and background sync handoff
 qrcode.js                   Local QR generator
 api/zavu.mjs                Browser relay endpoint and Zavu Telegram webhook
+api/process-queue.mjs       Protected queue worker that processes one Supabase queued Celo write per call
 api/timeline.mjs            Celo log reader for timeline hydration
-contracts/AidTraceLedger.sol On-chain proof ledger
+AidTraceLedger.sol          On-chain proof ledger
 scripts/send-zavu-message.mjs Outbound channel smoke test
+supabase/aidtrace_queue.sql Supabase durable queue table and RPCs for serialized Celo writes
 ```
 
+Security/readiness audit:
+
+```text
+AUDIT_BLOCKS.md             Blocked audit plan for relay auth, queue, timeline indexing, key rotation, CORS, tests, CI, and PWA installability
 ```
+
+The final pending task registry is kept at the end of `AUDIT_BLOCKS.md` with task IDs, priorities, files/envs, and acceptance checks. Check it before deploying or presenting, especially `P0-01 - AIDTRACE_WEBHOOK_TOKEN`.
 
 Local static preview:
 
 ```powershell
 npx serve .
 ```
+
+Required Vercel envs:
+
+```text
+AIDTRACE_CONTRACT=0xaf5c40e82ac9255479a1f447e81992b71c4f4934
+AIDTRACE_ALLOWED_ORIGINS=https://aidtrace-rastroayuda.vercel.app,http://127.0.0.1:8017,http://localhost:8017
+AIDTRACE_MAX_BROWSER_RELAY_ITEMS=20
+RASTROAYUDA_RELAYER_PRIVATE_KEY=<relayer private key, not admin key>
+RASTROAYUDA_ZAVU_API_KEY=<zv_live_...>
+SUPABASE_URL=<project url>
+SUPABASE_SERVICE_ROLE_KEY=<service role key>
+```
+
+Optional durable queue envs:
+
+```text
+AIDTRACE_QUEUE_ENABLED=true
+AIDTRACE_QUEUE_WORKER_TOKEN=<random long token>
+AIDTRACE_QUEUE_LOCK_SECONDS=120
+AIDTRACE_QUEUE_MAX_ATTEMPTS=8
+AIDTRACE_QUEUE_BATCH_SIZE=3
+```
+
+Only enable `AIDTRACE_QUEUE_ENABLED=true` after `supabase/aidtrace_queue.sql` has been run in Supabase. This queues Telegram/Zavu inbound messages so reconnect bursts are processed one by one. Browser offline proofs still use the direct relay path and return a transaction hash to the UI.
+
+The protected worker endpoint is `POST /api/process-queue` with `X-AidTrace-Worker-Token: <token>` or `Authorization: Bearer <token>`.
+
+Manual worker smoke test:
+
+```powershell
+$env:AIDTRACE_QUEUE_WORKER_TOKEN="<same token used in Vercel>"
+Invoke-RestMethod -Method POST `
+  -Uri "https://aidtrace-rastroayuda.vercel.app/api/process-queue?limit=3" `
+  -Headers @{ "X-AidTrace-Worker-Token" = $env:AIDTRACE_QUEUE_WORKER_TOKEN }
+```
+
+Optional browser queue flag:
+
+```text
+AIDTRACE_BROWSER_QUEUE_ENABLED=true
+```
+
+Leave `AIDTRACE_BROWSER_QUEUE_ENABLED` unset for the demo unless the UI is updated to track queued browser proofs without an immediate transaction hash.
+
+Supabase queue setup:
+
+```text
+Run supabase/aidtrace_queue.sql in the Supabase SQL editor before wiring queue-backed processing.
+```
+
+Optional webhook hardening:
+
+```text
+AIDTRACE_WEBHOOK_TOKEN=<random long token>
+```
+
+Only set `AIDTRACE_WEBHOOK_TOKEN` after Zavu is configured to send the same value as `X-AidTrace-Webhook-Token` or `Authorization: Bearer <token>` with inbound webhook requests.
 
 ## Contract Notes
 
