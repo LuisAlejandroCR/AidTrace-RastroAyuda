@@ -144,11 +144,13 @@ sw.js                       Service worker cache and background sync handoff
 qrcode.js                   Local QR generator
 assets/icons/*.png          PWA install icons
 api/zavu.mjs                Browser relay endpoint and Zavu Telegram webhook
+api/header-probe.mjs        Temporary-safe webhook header probe for Zavu setup
 api/process-queue.mjs       Protected queue worker that processes one Supabase queued Celo write per call
 api/timeline.mjs            Celo timeline reader with Supabase index fallback
 AidTraceLedger.sol          On-chain proof ledger
 scripts/send-zavu-message.mjs Outbound channel smoke test
 scripts/relayer-rotation.md Relayer key rotation and emergency revocation runbook
+scripts/webhook-token-setup.md Zavu inbound webhook token setup and rollback runbook
 scripts/final-demo-check.ps1 Final local + deployed endpoint smoke checks
 supabase/aidtrace_queue.sql Supabase durable queue table and RPCs for serialized Celo writes
 supabase/aidtrace_relay_guard.sql Supabase browser relay idempotency and per-minute abuse guard
@@ -251,7 +253,13 @@ Optional webhook hardening:
 AIDTRACE_WEBHOOK_TOKEN=<random long token>
 ```
 
-Only set `AIDTRACE_WEBHOOK_TOKEN` after Zavu is configured to send the same value as `X-AidTrace-Webhook-Token` or `Authorization: Bearer <token>` with inbound webhook requests.
+Only set `AIDTRACE_WEBHOOK_TOKEN` after Zavu is configured to send the same value as `X-AidTrace-Webhook-Token` or `Authorization: Bearer <token>` with inbound webhook requests. Prove this first with the header probe in `scripts/webhook-token-setup.md`.
+
+Setup and rollback runbook:
+
+```text
+scripts/webhook-token-setup.md
+```
 
 ## Contract Notes
 

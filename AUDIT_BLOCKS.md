@@ -352,9 +352,9 @@ Run this block before presenting or pushing:
 ```text
 git status --short
 git diff -- api/zavu.mjs api/timeline.mjs app.js sw.js manifest.webmanifest README.md AUDIT_BLOCKS.md supabase/aidtrace_queue.sql
-node --check api/zavu.mjs
-node --check api/timeline.mjs
-node --check app.js
+npm.cmd run test
+npm.cmd run check
+.\scripts\final-demo-check.ps1 -SkipRemote
 ```
 
 Manual demo path:
@@ -389,12 +389,15 @@ Action: review diff, push to GitHub manually, and let Vercel deploy.
 Acceptance: deployed /api/zavu still accepts valid browser relay from the app origin and valid Telegram webhook events.
 
 P0-01 - AIDTRACE_WEBHOOK_TOKEN
-Status: pending operator setup.
+Status: runbook ready; pending Zavu custom header setup and deploy verification.
 Why: protects Zavu inbound webhook from unauthenticated callers.
 Env: AIDTRACE_WEBHOOK_TOKEN.
-Action: create a long random token in Vercel.
+Files: api/zavu.mjs, api/header-probe.mjs, scripts/webhook-token-setup.md, README.md.
+Action: use scripts/webhook-token-setup.md to prove Zavu can attach X-AidTrace-Webhook-Token to /api/header-probe.
+Action: create a long random token only after the header probe passes.
 Action: configure Zavu webhook delivery to send the same value as X-AidTrace-Webhook-Token or Authorization: Bearer <token>.
 Do not: enable this env until Zavu sends the header, or Telegram inbound will return 401.
+Rollback: remove AIDTRACE_WEBHOOK_TOKEN from Vercel and redeploy if Zavu cannot attach the header yet.
 Acceptance: Telegram message records on Celo after token is enabled.
 
 P0-06 - AIDTRACE_ALLOWED_ORIGINS
@@ -523,9 +526,11 @@ Action: bump service worker cache after adding icon assets. DONE.
 Acceptance: browser Application > Manifest shows no icon warnings.
 
 P2-05 - Final demo verification
-Status: pending before presentation.
+Status: script ready; pending deployed smoke test and manual browser/Telegram walkthrough.
 Why: confirms the whole story still works after audit hardening.
-Files: app, api/zavu.mjs, api/timeline.mjs.
-Action: run Block 8 Demo Diff Review.
+Files: app, api/zavu.mjs, api/timeline.mjs, scripts/final-demo-check.ps1.
+Action: run Block 8 Demo Diff Review. SCRIPT READY.
+Action: run .\scripts\final-demo-check.ps1 -BaseUrl "https://aidtrace-rastroayuda.vercel.app" -Origin "https://aidtrace-rastroayuda.vercel.app" after deploy.
+Action: manually verify browser offline path, Telegram path, Timeline, and Celoscan Logs.
 Acceptance: browser offline path, Telegram path, Celo tx link, Timeline, and Celoscan Logs all pass.
 ```
