@@ -54,7 +54,7 @@ function Check($label, $response, $expectedStatus, $bodyCheck, $headerCheck) {
 
 function HttpGet($url, $headers = @{}) {
   try {
-    return Invoke-WebRequest -Method GET -Uri $url -Headers $headers -ErrorAction SilentlyContinue
+    return Invoke-WebRequest -Method GET -Uri $url -Headers $headers -UseBasicParsing -ErrorAction SilentlyContinue
   } catch {
     return $_.Exception.Response
   }
@@ -66,6 +66,7 @@ function HttpPost($url, $headers, $body) {
       -Headers $headers `
       -Body ($body | ConvertTo-Json -Depth 5) `
       -ContentType "application/json" `
+      -UseBasicParsing `
       -ErrorAction SilentlyContinue
   } catch {
     return $_.Exception.Response
