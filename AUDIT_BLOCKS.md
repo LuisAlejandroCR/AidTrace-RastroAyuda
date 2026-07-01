@@ -568,12 +568,39 @@ Acceptance: send a Telegram or WhatsApp message: "CELO1 entregar 50 cajas CENTRO
 P2-06 - Invent WhatsApp/SMS channel adapter
 Status: implementation complete; pending smoke check (scripts/invent-smoke-check.ps1).
 Why: reaches field workers using WhatsApp/SMS instead of Telegram — the majority in Venezuela.
-Files: api/invent.mjs, api/invent-notify.mjs, api/aidtrace-parser.mjs (parseAidTraceCommand),
-       api/zavu.mjs (_processInventQueueRow dispatch), test/invent-channel.test.mjs,
-       .github/workflows/ci-invent.yml, scripts/invent-setup.md, scripts/invent-smoke-check.ps1.
+Files: lib/invent-notify.mjs, lib/aidtrace-parser.mjs (parseAidTraceCommand),
+       api/invent.mjs, api/zavu.mjs (_processInventQueueRow dispatch),
+       test/invent-channel.test.mjs, .github/workflows/ci-invent.yml,
+       scripts/invent-setup.md, scripts/invent-smoke-check.ps1.
 Env: AIDTRACE_INVENT_WEBHOOK_TOKEN, AIDTRACE_INVENT_API_KEY.
 Action: follow scripts/invent-setup.md to connect WhatsApp Business in Invent and configure the HTTP action.
 Action: set AIDTRACE_INVENT_WEBHOOK_TOKEN and AIDTRACE_INVENT_API_KEY in Vercel environment.
 Action: run .\scripts\invent-smoke-check.ps1 -BaseUrl "https://aidtrace-rastroayuda.vercel.app" after deploy.
 Acceptance: smoke check 6/6 pass; WhatsApp custody command queued → Celo tx → final reply received in chat.
+
+P3-01 - Operator dashboard (iteration 2)
+Status: implementation complete.
+Why: closes operational blindspots — coordinators need to see queue health and retry failures without Supabase access.
+Files:
+  api/queue-status.mjs  — GET /api/queue-status; pending/completed/failed counts, last processed, recent failures.
+  api/retry-queue.mjs   — POST /api/retry-queue {id}; resets failed row to pending; requires AIDTRACE_QUEUE_WORKER_TOKEN.
+  api/export.mjs        — GET /api/export?center=X[&format=csv|json]; CSV/JSON download of center deliveries.
+  api/center-inventory.mjs — extended: GET ?all=true returns all centers with count + last delivery via get_center_summary().
+  supabase/aidtrace_queue_retry.sql — retry_aidtrace_message(uuid) RPC.
+  supabase/center_summary.sql       — get_center_summary() aggregate RPC.
+  supabase/center_inventory.sql     — fixed: DROP POLICY IF EXISTS makes file idempotent.
+  lib/aidtrace-parser.mjs, lib/timeline-parser.mjs, lib/invent-notify.mjs — moved from api/ to stay under Vercel Hobby 12-function limit (was 14, now 11).
+  index.html + app.js + styles.css:
+    - Timeline tab: gold badge shows count of unsynced local events.
+    - Timeline screen: "Relay issues" panel appears when queue has failed rows; per-job error + Retry button; coordinator token stored in localStorage.
+    - Map tab: "Centros de distribución" list shows all centers with delivery count, last date, and CSV export link.
+SQL to run (in order, after existing schema):
+  supabase/aidtrace_queue_retry.sql
+  supabase/center_summary.sql
+Env: AIDTRACE_QUEUE_WORKER_TOKEN (already required by process-queue.mjs — same token used by Retry button).
+Acceptance:
+  GET /api/queue-status → {ok,counts,workerHealthy,recentFailures}
+  GET /api/export?center=CENTRO-NORTE-1 → CSV download
+  Timeline tab badge shows pending count; relay issues panel appears on failures.
+  Map tab centers list loads after Supabase configured.
 ```

@@ -14,18 +14,23 @@ Each section maps to a plan block. Tick items in order — some depend on earlie
 
 ---
 
-## 1. Supabase schema (run once)
+## 1. Supabase schema (run once, safe to re-run)
 
-Open Supabase → SQL Editor → run each file in order:
+Open Supabase → SQL Editor → run each file **in order**:
 
-- [ ] `supabase/aidtrace_message_queue.sql` — queue table + RLS + helper RPCs
+- [ ] `supabase/aidtrace_relay_guard.sql` — browser relay idempotency + rate-limit tables
+- [ ] `supabase/aidtrace_queue.sql` — message queue table + RPCs
+- [ ] `supabase/aidtrace_queue_retry.sql` — `retry_aidtrace_message(uuid)` RPC
 - [ ] `supabase/center_inventory.sql` — center inventory table + `record_center_delivery` RPC
+- [ ] `supabase/center_summary.sql` — `get_center_summary()` aggregate RPC
 
 Verify:
 ```sql
-select count(*) from aidtrace_message_queue;       -- table exists
-select count(*) from aidtrace_center_inventory;    -- table exists
-select record_center_delivery('CENTRO-TEST','BATCH-1'); -- returns {"ok":true,...}
+select count(*) from aidtrace_message_queue;                        -- table exists
+select count(*) from aidtrace_center_inventory;                     -- table exists
+select record_center_delivery('CENTRO-TEST','BATCH-1');             -- {"ok":true,...}
+select retry_aidtrace_message('00000000-0000-0000-0000-000000000000'::uuid); -- {"ok":false,...}
+select * from get_center_summary() limit 5;                         -- empty or rows
 ```
 
 ---
@@ -80,6 +85,13 @@ Zavu dashboard → Conversations → send any message to your AidTrace bot from 
 | `AIDTRACE_CENTER_WEBHOOK_SECRET` | random hex: `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"` |
 | `AIDTRACE_CENTER_NOTIFY_CHAT` | Zavu chat ID to notify on center deliveries (same steps as FALLBACK_ZAVU_CHAT above) |
 
+### Operator dashboard / retry (iteration 2)
+| Variable | Value |
+|---|---|
+| `AIDTRACE_QUEUE_WORKER_TOKEN` | random token — also set in GitHub Actions secret of the same name |
+
+This is already required by `process-queue.mjs`. It is the same token coordinators enter in the PWA retry panel (Timeline → Relay issues → Coordinator token).
+
 ---
 
 ## 3. GitHub Actions secrets
@@ -91,6 +103,7 @@ In the GitHub repo → Settings → Secrets and variables → Actions:
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` — same as Vercel
 - [ ] `AIDTRACE_INVENT_API_KEY` — same as Vercel
 - [ ] `RASTROAYUDA_ZAVU_API_KEY` — same as Vercel
+- [ ] `AIDTRACE_QUEUE_WORKER_TOKEN` — same as Vercel
 
 These are used by `.github/workflows/process-queue.yml` (runs every 5 min).
 
@@ -144,12 +157,22 @@ See `scripts/invent-e2e-guide.md` — full walkthrough including queue monitorin
 2. Tap "📍 GPS" in the event form → coordinates appear
 3. Submit a custody event
 4. Return to Map → marker appears at GPS location
+5. "Centros de distribución" list shows below the map after first center delivery
+
+### Operator dashboard (iteration 2)
+1. `GET /api/queue-status` → `{ok:true, counts:{...}, workerHealthy:true}`
+2. `GET /api/export?center=CENTRO-NORTE-1` → CSV file downloads
+3. `GET /api/center-inventory?all=true` → `{ok:true, centers:[...]}`
+4. Open PWA Timeline tab with a pending local event → gold badge appears on tab
+5. Manually fail a queue row in Supabase (`update ... set status='failed'`) →
+   open Timeline tab → "Relay issues" panel appears with Retry button
 
 ---
 
 ## 7. Post-deploy monitoring
 
+- `GET /api/queue-status` — bookmark this; check `workerHealthy` and `counts.failed` daily
 - Vercel Functions log: `vercel logs --prod` — watch for `[center-webhook]` and `[invent]` lines
-- Supabase: `select * from aidtrace_message_queue order by created_at desc limit 10` — rows should move from `pending` → `completed`
+- Supabase: `select status, count(*) from aidtrace_message_queue group by status` — failed > 0 needs attention
 - GitHub Actions: `.github/workflows/process-queue.yml` — runs every 5 min — check last run status
 - Celoscan: `https://celoscan.io/address/0xaf5c40e82ac9255479a1f447e81992b71c4f4934` — new events should appear
