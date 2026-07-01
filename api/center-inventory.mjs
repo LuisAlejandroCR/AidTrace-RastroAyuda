@@ -2,9 +2,11 @@
  * api/center-inventory.mjs — read center delivery history
  *
  * GET /api/center-inventory?center=CENTRO-NORTE-1[&limit=50]
+ *   Returns delivery events for one center code.
  *
- * Returns all AidTrace delivery events linked to a center code.
- * Requires supabase/center_inventory.sql to be executed first.
+ * GET /api/center-inventory?all=true
+ *   Returns all center codes with total delivery count + last delivery date.
+ *   Requires supabase/center_summary.sql to be executed first.
  *
  * No auth required — all data is already public on Celoscan.
  * Env vars required:
@@ -21,12 +23,42 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "GET") return res.status(405).json({ ok: false, error: "Method not allowed" });
 
-  const center = req.query.center ? String(req.query.center).toUpperCase().trim() : null;
-  if (!center) return res.status(400).json({ ok: false, error: "Missing ?center= parameter" });
-
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     return res.status(503).json({ ok: false, error: "Center inventory not configured" });
   }
+
+  // ?all=true — aggregate summary across all centers
+  if (req.query.all === "true") {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_center_summary`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      });
+      if (!r.ok) {
+        console.error("[center-inventory] summary error:", r.status, await r.text().catch(() => ""));
+        return res.status(502).json({ ok: false, error: "Upstream error" });
+      }
+      const rows = await r.json();
+      const centers = (Array.isArray(rows) ? rows : []).map((row) => ({
+        centerCode:       row.center_code,
+        totalDeliveries:  Number(row.total_deliveries),
+        lastDelivery:     row.last_delivery,
+        exportUrl:        `/api/export?center=${encodeURIComponent(row.center_code)}`,
+      }));
+      return res.status(200).json({ ok: true, centers, count: centers.length });
+    } catch (err) {
+      console.error("[center-inventory] summary error:", err);
+      return res.status(500).json({ ok: false, error: "Internal error" });
+    }
+  }
+
+  const center = req.query.center ? String(req.query.center).toUpperCase().trim() : null;
+  if (!center) return res.status(400).json({ ok: false, error: "Missing ?center= or ?all=true parameter" });
 
   try {
     const limit = Math.min(Math.max(1, Number(req.query.limit || 50)), 200);

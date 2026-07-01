@@ -724,6 +724,79 @@ dd {
   line-height: 1.4;
 }
 
+/* Centers dashboard */
+.centers-panel {
+  margin-top: 24px;
+}
+
+.centers-loading,
+.centers-empty {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 16px 0;
+}
+
+.centers-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.centers-title {
+  font-size: 0.8rem;
+  font-weight: 850;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.centers-count {
+  background: var(--line);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  color: var(--muted);
+  padding: 1px 8px;
+}
+
+.center-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.center-row-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.center-code {
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 850;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.center-meta {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.center-export-btn {
+  flex-shrink: 0;
+  text-decoration: none;
+  font-size: 0.75rem;
+}
+
 /* Failed jobs panel */
 .failed-jobs-panel {
   margin-top: 28px;

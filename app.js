@@ -117,6 +117,12 @@ const translations = {
     gpsCapturing: "📍 Locating…",
     gpsCaptured: "📍 Location set",
     mapEventsWithoutLocation: "Events without GPS",
+    centersTitle: "Distribution centers",
+    centersLastDelivery: "Last delivery",
+    centersTotal: "deliveries",
+    centersEmpty: "No center deliveries recorded yet.",
+    centersExport: "Export CSV",
+    centersLoading: "Loading centers…",
     failedJobsTitle: "Relay issues",
     failedJobsWorkerStuck: "Worker has not processed anything in 15 min",
     failedJobsRetry: "Retry",
@@ -220,6 +226,12 @@ const translations = {
     gpsCapturing: "📍 Localizando…",
     gpsCaptured: "📍 Ubicacion lista",
     mapEventsWithoutLocation: "Eventos sin GPS",
+    centersTitle: "Centros de distribución",
+    centersLastDelivery: "Última entrega",
+    centersTotal: "entregas",
+    centersEmpty: "Aún no hay entregas registradas en centros.",
+    centersExport: "Exportar CSV",
+    centersLoading: "Cargando centros…",
     failedJobsTitle: "Problemas de relay",
     failedJobsWorkerStuck: "El worker no ha procesado nada en 15 min",
     failedJobsRetry: "Reintentar",
@@ -679,6 +691,47 @@ function refreshAfterOnline() {
   setTimeout(() => window.location.reload(), 1200);
 }
 
+async function fetchCenterSummary() {
+  const panel = $("centersPanel");
+  if (!panel) return;
+  if (!navigator.onLine) return;
+  panel.innerHTML = `<p class="centers-loading">${t("centersLoading")}</p>`;
+  try {
+    const r = await fetch(`${APP_ORIGIN}/api/center-inventory?all=true`);
+    if (!r.ok) { panel.innerHTML = ""; return; }
+    renderCenterSummary(await r.json());
+  } catch { panel.innerHTML = ""; }
+}
+
+function renderCenterSummary(data) {
+  const panel = $("centersPanel");
+  if (!panel) return;
+  const { centers = [] } = data;
+
+  if (!centers.length) {
+    panel.innerHTML = `<p class="centers-empty">${t("centersEmpty")}</p>`;
+    return;
+  }
+
+  const rows = centers.map((c) => {
+    const date = c.lastDelivery ? new Date(c.lastDelivery).toLocaleDateString() : "—";
+    return `<div class="center-row">
+      <div class="center-row-info">
+        <strong class="center-code">${c.centerCode}</strong>
+        <span class="center-meta">${c.totalDeliveries} ${t("centersTotal")} · ${t("centersLastDelivery")}: ${date}</span>
+      </div>
+      <a class="secondary compact center-export-btn" href="${c.exportUrl}" download>${t("centersExport")}</a>
+    </div>`;
+  }).join("");
+
+  panel.innerHTML = `
+    <div class="centers-header">
+      <span class="centers-title">${t("centersTitle")}</span>
+      <span class="centers-count">${centers.length}</span>
+    </div>
+    ${rows}`;
+}
+
 async function fetchQueueStatus() {
   if (!navigator.onLine) return;
   try {
@@ -778,7 +831,7 @@ function showScreen(name) {
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.classList.toggle("is-active", tab.dataset.screenTarget === name);
   });
-  if (name === "map") setTimeout(initMap, 50);
+  if (name === "map") { setTimeout(initMap, 50); setTimeout(fetchCenterSummary, 200); }
   if (name === "timeline") setTimeout(fetchQueueStatus, 150);
 }
 

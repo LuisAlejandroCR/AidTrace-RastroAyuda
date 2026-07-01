@@ -31,6 +31,7 @@ create index if not exists aidtrace_center_inventory_batch_idx
 -- bypasses RLS — the service role key is never exposed to clients.
 alter table public.aidtrace_center_inventory enable row level security;
 
+drop policy if exists "aidtrace_center_inventory_public_read" on public.aidtrace_center_inventory;
 create policy "aidtrace_center_inventory_public_read"
   on public.aidtrace_center_inventory
   for select
