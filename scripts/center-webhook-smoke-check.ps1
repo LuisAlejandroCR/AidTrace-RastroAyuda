@@ -31,8 +31,13 @@ $testCenterCode = "CENTRO-SMOKE-$(Get-Random -Maximum 9999)"
 
 function Check($label, $response, $expectedStatus, $bodyCheck) {
   $ok = $true
-  if ($response.StatusCode -ne $expectedStatus) {
-    Write-Host "FAIL [$label] expected HTTP $expectedStatus got $($response.StatusCode)" -ForegroundColor Red
+  if ($null -eq $response -or $null -eq $response.StatusCode) {
+    Write-Host "FAIL [$label] no response received" -ForegroundColor Red
+    $script:fail++
+    return
+  }
+  if ([int]$response.StatusCode -ne $expectedStatus) {
+    Write-Host "FAIL [$label] expected HTTP $expectedStatus got $([int]$response.StatusCode)" -ForegroundColor Red
     $ok = $false
   } else {
     $body = $response.Content | ConvertFrom-Json -ErrorAction SilentlyContinue
@@ -105,12 +110,13 @@ $r = Post @{ Authorization = "Bearer $Secret" } @{
 Check "Valid center.delivery -> 200 ok" $r 200 { param($b) $b.ok -eq $true }
 
 # Test 5: GET /api/center-inventory -> returns the center row
-# (only meaningful if Supabase is configured — skips gracefully if not)
-$r = Get "$inventoryEndpoint?center=$testCenterCode"
-if ($r.StatusCode -eq 503) {
+# Brief pause so the Supabase write from test 4 is visible to the read path.
+Start-Sleep -Seconds 2
+$r = Get "${inventoryEndpoint}?center=${testCenterCode}"
+if ($null -ne $r -and [int]$r.StatusCode -eq 503) {
   Write-Host "SKIP [center-inventory] Supabase not configured (503)" -ForegroundColor Yellow
 } else {
-  Check "center-inventory GET -> 200 ok" $r 200 { param($b) $b.ok -eq $true }
+  Check "center-inventory GET -> 200 ok" $r 200 { param($b) $b.ok -eq $true -and $b.count -ge 1 }
 }
 
 Write-Host ""
