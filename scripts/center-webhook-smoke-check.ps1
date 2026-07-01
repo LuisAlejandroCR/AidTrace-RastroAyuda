@@ -53,7 +53,7 @@ function Post($headers, $body, $endpoint) {
       -Body ($body | ConvertTo-Json -Depth 5) `
       -ContentType "application/json" `
       -UseBasicParsing `
-      -ErrorAction SilentlyContinue
+      -ErrorAction Stop
   } catch {
     return $_.Exception.Response
   }
@@ -61,7 +61,7 @@ function Post($headers, $body, $endpoint) {
 
 function Get($url) {
   try {
-    return Invoke-WebRequest -Method GET -Uri $url -UseBasicParsing -ErrorAction SilentlyContinue
+    return Invoke-WebRequest -Method GET -Uri $url -UseBasicParsing -ErrorAction Stop
   } catch {
     return $_.Exception.Response
   }
