@@ -681,7 +681,7 @@ function render() {
     const previous = document.createElement("button");
     previous.className = "secondary compact page-button";
     previous.type = "button";
-    previous.textContent = "‹";
+    previous.textContent = "<";
     previous.disabled = timelinePage === 1;
     previous.setAttribute("aria-label", t("pagePrevious"));
     previous.dataset.timelinePage = String(timelinePage - 1);
@@ -692,23 +692,10 @@ function render() {
     pageStatus.textContent = `${t("pageLabel")} ${timelinePage} ${t("timelineOf")} ${totalPages}`;
     pages.appendChild(pageStatus);
 
-    const pageSelect = document.createElement("select");
-    pageSelect.className = "page-select";
-    pageSelect.dataset.timelineSelect = "true";
-    pageSelect.setAttribute("aria-label", t("pageSelect"));
-    for (let page = 1; page <= totalPages; page += 1) {
-      const option = document.createElement("option");
-      option.value = String(page);
-      option.textContent = `${t("pageLabel")} ${page}`;
-      option.selected = page === timelinePage;
-      pageSelect.appendChild(option);
-    }
-    pages.appendChild(pageSelect);
-
     const next = document.createElement("button");
     next.className = "secondary compact page-button";
     next.type = "button";
-    next.textContent = "›";
+    next.textContent = ">";
     next.disabled = timelinePage === totalPages;
     next.setAttribute("aria-label", t("pageNext"));
     next.dataset.timelinePage = String(timelinePage + 1);

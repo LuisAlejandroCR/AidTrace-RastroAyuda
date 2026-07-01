@@ -207,11 +207,15 @@ AIDTRACE_QUEUE_WORKER_TOKEN=<random long token>
 AIDTRACE_QUEUE_LOCK_SECONDS=120
 AIDTRACE_QUEUE_MAX_ATTEMPTS=8
 AIDTRACE_QUEUE_BATCH_SIZE=3
+AIDTRACE_QUEUE_PROCESS_ON_INBOUND=true
+AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT=2
 ```
 
 Only enable `AIDTRACE_QUEUE_ENABLED=true` after `supabase/aidtrace_queue.sql` has been run in Supabase. This queues Telegram/Zavu inbound messages so reconnect bursts are processed one by one. Browser offline proofs still use the direct relay path and return a transaction hash to the UI.
 
 The protected worker endpoint is `POST /api/process-queue` with `X-AidTrace-Worker-Token: <token>` or `Authorization: Bearer <token>`.
+
+`AIDTRACE_QUEUE_PROCESS_ON_INBOUND` is enabled by default. After Zavu receives a Telegram message, AidTrace stores it, sends the queued acknowledgement, then kicks up to `AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT` queued writes immediately. GitHub Actions and the manual worker remain the retry fallback.
 
 Automatic queue worker:
 

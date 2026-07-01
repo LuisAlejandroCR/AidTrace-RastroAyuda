@@ -47,6 +47,8 @@ const BROWSER_QUEUE_ENABLED = process.env.AIDTRACE_BROWSER_QUEUE_ENABLED === "tr
 const BROWSER_RELAY_GUARD_ENABLED = process.env.AIDTRACE_BROWSER_RELAY_GUARD_ENABLED === "true";
 const BROWSER_RELAY_RATE_LIMIT = Number(process.env.AIDTRACE_BROWSER_RELAY_RATE_LIMIT || "30");
 const QUEUE_WORKER_ID = process.env.AIDTRACE_QUEUE_WORKER_ID || "aidtrace-vercel-worker";
+const QUEUE_PROCESS_ON_INBOUND = process.env.AIDTRACE_QUEUE_PROCESS_ON_INBOUND !== "false";
+const QUEUE_INBOUND_PROCESS_LIMIT = Math.max(1, Number(process.env.AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT || "2"));
 let celoWriteQueue = Promise.resolve();
 
 const abi = [
@@ -700,6 +702,17 @@ export async function processQueuedAidTraceMessage(workerId = QUEUE_WORKER_ID) {
   }
 }
 
+async function processInboundQueueKick(messageId) {
+  if (!QUEUE_PROCESS_ON_INBOUND) return;
+
+  const workerId = `aidtrace-zavu-kick-${messageId || randomUUID()}`;
+  for (let index = 0; index < QUEUE_INBOUND_PROCESS_LIMIT; index += 1) {
+    const result = await processQueuedAidTraceMessage(workerId);
+    if (!result.processed) break;
+    if (!result.ok) break;
+  }
+}
+
 export default async function handler(req, res) {
   setCors(req, res);
 
@@ -749,6 +762,7 @@ export default async function handler(req, res) {
     let parsed;
     let replyText;
     let idempotencyKey;
+    let queuedMessageId = "";
 
     try {
       parsed = parseAidTraceText(data.text);
@@ -779,6 +793,7 @@ export default async function handler(req, res) {
           "AidTrace lo registrara en Celo y enviara el link de auditoria.",
         ].join("\n");
         idempotencyKey = `aidtrace-queued-${messageId}`;
+        queuedMessageId = messageId;
       } else {
         const { messageId, txHash } = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed));
         replyText = buildSuccessReply(parsed, txHash);
@@ -795,6 +810,12 @@ export default async function handler(req, res) {
       text: replyText,
       idempotencyKey,
     });
+
+    if (queuedMessageId) {
+      await processInboundQueueKick(queuedMessageId).catch((error) => {
+        console.error("Inbound queue kick failed:", error);
+      });
+    }
 
     return res.status(200).send("OK");
   } catch (error) {

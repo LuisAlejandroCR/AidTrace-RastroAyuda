@@ -63,13 +63,13 @@ h1 {
 .brand-title {
   display: inline-flex;
   align-items: center;
-  gap: clamp(6px, 1.1vw, 10px);
+  gap: clamp(4px, 0.9vw, 8px);
   flex-wrap: nowrap;
 }
 
 .brand-mark {
-  width: clamp(60px, 5vw, 86px);
-  height: clamp(60px, 5vw, 86px);
+  width: clamp(52px, 4.4vw, 76px);
+  height: clamp(52px, 4.4vw, 76px);
   flex: 0 0 auto;
   margin-bottom: 0;
   overflow: visible;
@@ -368,20 +368,9 @@ button {
   color: var(--ink);
   font-size: 0.86rem;
   font-weight: 900;
+  min-width: 92px;
+  text-align: center;
   white-space: nowrap;
-}
-
-.page-select {
-  min-height: 38px;
-  width: auto;
-  max-width: 150px;
-  border-color: var(--sage-dark);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--sage-dark);
-  font-size: 16px;
-  font-weight: 900;
-  padding: 7px 34px 7px 13px;
 }
 
 .page-button:disabled {
@@ -582,16 +571,16 @@ dd {
 
   .brand-title {
     align-items: center;
-    gap: 6px;
+    gap: 4px;
   }
 
   .brand-mark {
-    width: 48px;
-    height: 48px;
+    width: 42px;
+    height: 42px;
   }
 
   h1 {
-    font-size: clamp(3rem, 17vw, 4.4rem);
+    font-size: clamp(2.9rem, 16vw, 4.2rem);
   }
 
   .tabbar {
@@ -637,13 +626,8 @@ dd {
   }
 
   .timeline-controls .pagination {
-    justify-content: space-between;
+    justify-content: flex-start;
     width: 100%;
-  }
-
-  .page-select {
-    flex: 1 1 120px;
-    max-width: none;
   }
 
   .timeline-item {
