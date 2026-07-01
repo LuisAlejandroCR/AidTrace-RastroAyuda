@@ -724,6 +724,89 @@ dd {
   line-height: 1.4;
 }
 
+/* Failed jobs panel */
+.failed-jobs-panel {
+  margin-top: 28px;
+  border: 1.5px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.failed-jobs-header {
+  padding: 12px 16px 10px;
+  background: color-mix(in srgb, var(--danger) 8%, var(--mist));
+}
+
+.failed-jobs-title {
+  font-size: 0.82rem;
+  font-weight: 850;
+  color: var(--danger);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.failed-jobs-stuck {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--danger);
+}
+
+.failed-job {
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.failed-job-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 0.82rem;
+}
+
+.failed-job-tag {
+  background: var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  font-weight: 850;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.failed-job-attempts {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.failed-job-error {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.failed-jobs-token {
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.failed-jobs-token summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+.coordinator-token-input {
+  margin-top: 8px;
+  width: 100%;
+  font-size: 0.82rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .mark-route,
   .mark-pulse {

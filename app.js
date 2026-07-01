@@ -5,7 +5,10 @@ const CONTRACT_ADDRESS = "0xaf5c40e82ac9255479a1f447e81992b71c4f4934";
 const APP_ORIGIN = window.location.origin;
 const RELAY_ENDPOINT = `${APP_ORIGIN}/api/zavu`;
 const TIMELINE_ENDPOINT = `${APP_ORIGIN}/api/timeline`;
+const QUEUE_STATUS_ENDPOINT = `${APP_ORIGIN}/api/queue-status`;
+const RETRY_ENDPOINT = `${APP_ORIGIN}/api/retry-queue`;
 const STORE_KEY = "aidtrace_state_v4";
+const COORDINATOR_TOKEN_KEY = "aidtrace_coordinator_token";
 const ONLINE_RELOAD_KEY = "aidtrace_reloaded_after_online";
 const TIMELINE_FETCH_LIMIT = 100;
 const TIMELINE_PAGE_SIZE = 10;
@@ -114,6 +117,16 @@ const translations = {
     gpsCapturing: "📍 Locating…",
     gpsCaptured: "📍 Location set",
     mapEventsWithoutLocation: "Events without GPS",
+    failedJobsTitle: "Relay issues",
+    failedJobsWorkerStuck: "Worker has not processed anything in 15 min",
+    failedJobsRetry: "Retry",
+    failedJobsRetrying: "…",
+    failedJobsRetryOk: "Queued",
+    failedJobsTokenPrompt: "Coordinator token",
+    failedJobsChannel: "Channel",
+    failedJobsBatch: "Batch",
+    failedJobsAttempts: "Attempts",
+    failedJobsError: "Last error",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -207,6 +220,16 @@ const translations = {
     gpsCapturing: "📍 Localizando…",
     gpsCaptured: "📍 Ubicacion lista",
     mapEventsWithoutLocation: "Eventos sin GPS",
+    failedJobsTitle: "Problemas de relay",
+    failedJobsWorkerStuck: "El worker no ha procesado nada en 15 min",
+    failedJobsRetry: "Reintentar",
+    failedJobsRetrying: "…",
+    failedJobsRetryOk: "En cola",
+    failedJobsTokenPrompt: "Token coordinador",
+    failedJobsChannel: "Canal",
+    failedJobsBatch: "Lote",
+    failedJobsAttempts: "Intentos",
+    failedJobsError: "Ultimo error",
   },
 };
 
@@ -656,6 +679,98 @@ function refreshAfterOnline() {
   setTimeout(() => window.location.reload(), 1200);
 }
 
+async function fetchQueueStatus() {
+  if (!navigator.onLine) return;
+  try {
+    const r = await fetch(QUEUE_STATUS_ENDPOINT);
+    if (!r.ok) return;
+    renderFailedJobs(await r.json());
+  } catch { /* offline — silent */ }
+}
+
+function renderFailedJobs(data) {
+  const panel = $("failedJobsPanel");
+  if (!panel) return;
+
+  const { counts = {}, recentFailures = [], workerHealthy = true } = data;
+  const hasFailed = (counts.failed || 0) > 0;
+  const workerStuck = !workerHealthy && (counts.pending || 0) > 0;
+
+  if (!hasFailed && !workerStuck) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+    return;
+  }
+
+  const rows = recentFailures.map((job) => {
+    const errSnippet = (job.lastError || "unknown error").slice(0, 120);
+    return `<div class="failed-job">
+      <div class="failed-job-meta">
+        <span class="failed-job-tag">${job.channel || "?"}</span>
+        <span><strong>${job.batchId || "—"}</strong></span>
+        <span class="failed-job-attempts">${t("failedJobsAttempts")}: ${job.attempts}</span>
+      </div>
+      <p class="failed-job-error">${errSnippet}</p>
+      <button class="secondary compact failed-retry-btn" data-job-id="${job.id}">${t("failedJobsRetry")}</button>
+    </div>`;
+  }).join("");
+
+  panel.innerHTML = `
+    <div class="failed-jobs-header">
+      <span class="failed-jobs-title">⚠ ${t("failedJobsTitle")} (${counts.failed})</span>
+      ${workerStuck ? `<p class="failed-jobs-stuck">${t("failedJobsWorkerStuck")}</p>` : ""}
+    </div>
+    ${rows}
+    <details class="failed-jobs-token">
+      <summary>${t("failedJobsTokenPrompt")}</summary>
+      <input id="coordinatorTokenInput" type="password" class="coordinator-token-input"
+        placeholder="aidtrace-worker-token"
+        value="${localStorage.getItem(COORDINATOR_TOKEN_KEY) || ""}" />
+    </details>`;
+
+  panel.hidden = false;
+
+  panel.querySelectorAll(".failed-retry-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.jobId;
+      let token = localStorage.getItem(COORDINATOR_TOKEN_KEY) || "";
+      const tokenInput = $("coordinatorTokenInput");
+      if (tokenInput?.value) {
+        token = tokenInput.value.trim();
+        localStorage.setItem(COORDINATOR_TOKEN_KEY, token);
+      }
+      if (!token) {
+        notify(t("failedJobsTokenPrompt"));
+        panel.querySelector("details")?.setAttribute("open", "");
+        return;
+      }
+      const orig = btn.textContent;
+      btn.textContent = t("failedJobsRetrying");
+      btn.disabled = true;
+      try {
+        const r = await fetch(RETRY_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id }),
+        });
+        const res = await r.json();
+        if (res.ok) {
+          btn.textContent = t("failedJobsRetryOk");
+          setTimeout(fetchQueueStatus, 1500);
+        } else {
+          notify(res.error || "Retry failed");
+          btn.textContent = orig;
+          btn.disabled = false;
+        }
+      } catch {
+        notify("Retry failed — check connection");
+        btn.textContent = orig;
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
 function showScreen(name) {
   document.querySelectorAll(".screen").forEach((screen) => {
     screen.classList.toggle("is-active", screen.id === `screen-${name}`);
@@ -664,6 +779,7 @@ function showScreen(name) {
     tab.classList.toggle("is-active", tab.dataset.screenTarget === name);
   });
   if (name === "map") setTimeout(initMap, 50);
+  if (name === "timeline") setTimeout(fetchQueueStatus, 150);
 }
 
 const MAP_ACTION_COLORS = {
