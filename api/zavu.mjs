@@ -49,7 +49,8 @@ const BROWSER_RELAY_RATE_LIMIT = Number(process.env.AIDTRACE_BROWSER_RELAY_RATE_
 const QUEUE_WORKER_ID = process.env.AIDTRACE_QUEUE_WORKER_ID || "aidtrace-vercel-worker";
 const QUEUE_PROCESS_ON_INBOUND = process.env.AIDTRACE_QUEUE_PROCESS_ON_INBOUND !== "false";
 const QUEUE_INBOUND_PROCESS_LIMIT = Math.max(1, Number(process.env.AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT || "2"));
-const CENTER_WEBHOOK_URL = process.env.AIDTRACE_CENTER_WEBHOOK_URL || "";
+const CENTER_WEBHOOK_URL    = process.env.AIDTRACE_CENTER_WEBHOOK_URL    || "";
+const CENTER_WEBHOOK_SECRET = process.env.AIDTRACE_CENTER_WEBHOOK_SECRET || "";
 let celoWriteQueue = Promise.resolve();
 
 const abi = [
@@ -706,7 +707,10 @@ async function emitCenterDelivery({ batchId, actionType, details, locationText, 
     try {
       await fetch(CENTER_WEBHOOK_URL, {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(CENTER_WEBHOOK_SECRET && { Authorization: `Bearer ${CENTER_WEBHOOK_SECRET}` }),
+        },
         body:    JSON.stringify(payload),
       });
       console.info("[center] webhook emitted:", centerCode);

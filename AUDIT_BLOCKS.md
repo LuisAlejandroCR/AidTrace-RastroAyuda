@@ -549,17 +549,21 @@ Acceptance: browser offline path, Telegram path, Celo tx link, Timeline, and Cel
 Last verified deployed: final-demo-check.ps1 passed.
 
 P2-07 - Center inventory integration
-Status: implementation complete; pending supabase/center_inventory.sql execution and optional AIDTRACE_CENTER_WEBHOOK_URL setup.
+Status: implementation complete; pending supabase/center_inventory.sql execution and Vercel env var setup.
 Why: makes AidTrace the proof backend for supply-center inventory systems; closes the audit gap noted by the hackathon review ("blockchain traceability layer that complements shelter-mapping projects").
 Files: api/zavu.mjs (parseCenterCode, emitCenterDelivery hooked in all 4 write paths),
        api/center-inventory.mjs (GET /api/center-inventory?center=CENTRO-NORTE-1),
+       api/center-webhook.mjs (POST receiver — verifies Bearer secret, Telegram-notifies coordinator),
        supabase/center_inventory.sql (aidtrace_center_inventory table + record_center_delivery RPC).
-Env: AIDTRACE_CENTER_WEBHOOK_URL (optional) — POST target for external systems (e.g. VnzlCentrosDeInsumos).
+Env (all optional):
+  AIDTRACE_CENTER_WEBHOOK_URL    = https://aidtrace-rastroayuda.vercel.app/api/center-webhook
+  AIDTRACE_CENTER_WEBHOOK_SECRET = <random hex, e.g. node -e "console.log(require('crypto').randomBytes(24).toString('hex'))">
+  AIDTRACE_CENTER_NOTIFY_CHAT    = <Zavu chat ID — Zavu dashboard → Conversations → copy chat ID from URL>
 Center code detection: regex /\b(CENTRO|CENTER|CC|DIST)-[\w-]{2,30}\b/i matched against event details, locationText, and batchId.
 Accepted action types: DELIVERED, DELIVER, ARRIVED.
 Action: run supabase/center_inventory.sql in Supabase SQL editor.
-Action: optionally set AIDTRACE_CENTER_WEBHOOK_URL in Vercel to receive webhooks on each delivery.
-Acceptance: send a Telegram or WhatsApp message: "CELO1 entregar 50 cajas CENTRO-NORTE-1" → Celo tx recorded → GET /api/center-inventory?center=CENTRO-NORTE-1 returns the delivery row with txHash.
+Action: set all three env vars in Vercel → the webhook loops back to the same deployment, verifies the secret, and sends a Telegram message to the coordinator chat on each delivery.
+Acceptance: send a Telegram or WhatsApp message: "CELO1 entregar 50 cajas CENTRO-NORTE-1" → Celo tx recorded → GET /api/center-inventory?center=CENTRO-NORTE-1 returns delivery row with txHash → coordinator Telegram receives notification.
 
 P2-06 - Invent WhatsApp/SMS channel adapter
 Status: implementation complete; pending smoke check (scripts/invent-smoke-check.ps1).
