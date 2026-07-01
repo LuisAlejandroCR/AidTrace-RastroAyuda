@@ -11,7 +11,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { celo } from "viem/chains";
-import { parseAidTraceText } from "./aidtrace-parser.mjs";
+import { parseAidTraceText } from "../lib/aidtrace-parser.mjs";
 
 const CONTRACT_ADDRESS =
   process.env.AIDTRACE_CONTRACT || "0xaf5c40e82ac9255479a1f447e81992b71c4f4934";
@@ -741,7 +741,7 @@ async function _processInventQueueRow(row) {
 
     if (chatId && process.env.AIDTRACE_INVENT_API_KEY) {
       try {
-        const { sendInventReply, buildFinalReply } = await import("./invent-notify.mjs");
+        const { sendInventReply, buildFinalReply } = await import("../lib/invent-notify.mjs");
         const text = buildFinalReply({ batchId, eventType, details, txHash: result.txHash, channel: channelType });
         await sendInventReply({ chatId, text });
         console.info("[invent] reply sent to chat", chatId);

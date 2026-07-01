@@ -14,8 +14,8 @@
 import { strict as assert } from 'node:assert';
 import { describe, it }     from 'node:test';
 
-import { parseAidTraceCommand }           from '../api/aidtrace-parser.mjs';
-import { buildFinalReply }                from '../api/invent-notify.mjs';
+import { parseAidTraceCommand }           from '../lib/aidtrace-parser.mjs';
+import { buildFinalReply }                from '../lib/invent-notify.mjs';
 
 // ---------------------------------------------------------------------------
 // Parser tests (WhatsApp natural-language variants)

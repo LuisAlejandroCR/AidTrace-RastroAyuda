@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseAidTraceText } from "../api/aidtrace-parser.mjs";
+import { parseAidTraceText } from "../lib/aidtrace-parser.mjs";
 
 test("parses compact Spanish CELO alias and keeps quantity in details", () => {
   assert.deepEqual(

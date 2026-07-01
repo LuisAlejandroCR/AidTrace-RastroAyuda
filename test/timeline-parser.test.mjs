@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { bytes32ToText, parseReferenceURI } from "../api/timeline-parser.mjs";
+import { bytes32ToText, parseReferenceURI } from "../lib/timeline-parser.mjs";
 
 test("decodes zero-padded bytes32 text", () => {
   assert.equal(

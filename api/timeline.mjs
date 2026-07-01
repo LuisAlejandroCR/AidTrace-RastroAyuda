@@ -4,7 +4,7 @@ import {
   parseAbiItem,
 } from "viem";
 import { celo } from "viem/chains";
-import { bytes32ToText, parseReferenceURI } from "./timeline-parser.mjs";
+import { bytes32ToText, parseReferenceURI } from "../lib/timeline-parser.mjs";
 
 const CONTRACT_ADDRESS =
   process.env.AIDTRACE_CONTRACT ||
