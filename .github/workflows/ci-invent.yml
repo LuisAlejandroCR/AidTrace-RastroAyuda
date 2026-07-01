@@ -1,0 +1,43 @@
+# .github/workflows/ci-invent.yml
+#
+# Runs the Invent channel tests as part of CI.
+# Merge this into the existing .github/workflows/ci.yml or keep it separate.
+#
+# To merge into existing ci.yml, add this step after the existing npm test step:
+#
+#   - name: Run Invent channel tests
+#     run: node --test test/invent-channel.test.mjs
+
+name: CI — Invent channel
+
+on:
+  push:
+    paths:
+      - 'api/invent.mjs'
+      - 'api/invent-notify.mjs'
+      - 'api/aidtrace-parser.mjs'
+      - 'test/invent-channel.test.mjs'
+  pull_request:
+    paths:
+      - 'api/invent.mjs'
+      - 'api/invent-notify.mjs'
+      - 'test/invent-channel.test.mjs'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run Invent channel tests
+        run: node --test test/invent-channel.test.mjs
+
+      - name: Run full test suite
+        run: npm test
