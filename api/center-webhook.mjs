@@ -21,9 +21,11 @@
 
 import Zavudev from "@zavudev/sdk";
 
-const SECRET      = process.env.AIDTRACE_CENTER_WEBHOOK_SECRET || "";
-const NOTIFY_CHAT = process.env.AIDTRACE_CENTER_NOTIFY_CHAT    || "";
-const CELOSCAN_TX = process.env.CELOSCAN_TX_BASE               || "https://celoscan.io/tx";
+const SECRET        = process.env.AIDTRACE_CENTER_WEBHOOK_SECRET || "";
+const NOTIFY_CHAT   = process.env.AIDTRACE_CENTER_NOTIFY_CHAT    || "";
+const CELOSCAN_TX   = process.env.CELOSCAN_TX_BASE               || "https://celoscan.io/tx";
+const SUPABASE_URL  = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+const SUPABASE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 const zavu = new Zavudev({ apiKey: process.env.RASTROAYUDA_ZAVU_API_KEY });
 
@@ -45,6 +47,33 @@ export default async function handler(req, res) {
 
   const { centerCode, batchId, actionType, details, txHash } = body;
   console.info("[center-webhook] received:", centerCode, batchId, actionType);
+
+  // Record the delivery in Supabase so center-inventory reflects it.
+  // Uses upsert (ON CONFLICT DO UPDATE) so double-calls from zavu.mjs are no-ops.
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_center_delivery`, {
+        method: "POST",
+        headers: {
+          apikey:          SUPABASE_KEY,
+          Authorization:   `Bearer ${SUPABASE_KEY}`,
+          "Content-Type":  "application/json",
+        },
+        body: JSON.stringify({
+          p_center_code:  centerCode,
+          p_batch_id:     batchId,
+          p_action_type:  actionType  || "DELIVERED",
+          p_details:      details     || "",
+          p_tx_hash:      txHash      || null,
+        }),
+      });
+      if (!r.ok) {
+        console.warn("[center-webhook] Supabase record failed:", r.status, await r.text().catch(() => ""));
+      }
+    } catch (err) {
+      console.warn("[center-webhook] Supabase record error:", err.message);
+    }
+  }
 
   if (NOTIFY_CHAT) {
     try {
