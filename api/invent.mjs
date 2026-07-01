@@ -51,12 +51,12 @@ function parseCommand(text) {
   return { batchId, eventType, details: rest || '(sin detalles)' };
 }
 
-async function enqueueSupabase(payload) {
+async function enqueueSupabase({ contactId, chatId, channel, phone, batchId, eventType, details, referenceURI }) {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Supabase env vars missing');
 
-  const msgId = `invent:${payload.channel}:${payload.contactId}:${payload.batchId}:${Date.now()}`;
+  const msgId = `invent:${channel}:${contactId}:${batchId}:${Date.now()}`;
   const r = await fetch(`${url}/rest/v1/rpc/enqueue_aidtrace_message`, {
     method: 'POST',
     headers: {
@@ -66,14 +66,16 @@ async function enqueueSupabase(payload) {
     },
     body: JSON.stringify({
       p_inbound_message_id: msgId,
-      p_channel:            `invent_${payload.channel}`,
-      p_source:             payload.phone || payload.contactId,
-      p_payload:            JSON.stringify({
-        batchId:      payload.batchId,
-        eventType:    payload.eventType,
-        details:      payload.details,
-        referenceURI: payload.referenceURI,
-      }),
+      p_source:             phone || contactId,
+      p_channel:            `invent_${channel}`,
+      p_recipient:          contactId,
+      p_batch_id:           batchId,
+      p_action_type:        eventType,
+      p_details:            details,
+      p_payload: {
+        batchId, eventType, details, referenceURI,
+        chatId: chatId || null,
+      },
     }),
   });
   if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`);
@@ -143,6 +145,7 @@ export default async function handler(req, res) {
   // Parse body
   const body = req.body ?? {};
   const contactId = body.contact_id;
+  const chatId    = body.chat_id || '';
   const message   = body.message;
   const channel   = (body.channel || 'whatsapp').toLowerCase();
   const phone     = body.phone || '';
@@ -174,7 +177,7 @@ export default async function handler(req, res) {
 
   try {
     if (useQueue) {
-      await enqueueSupabase({ contactId, channel, phone, batchId, eventType, details, referenceURI });
+      await enqueueSupabase({ contactId, chatId, channel, phone, batchId, eventType, details, referenceURI });
       return res.status(200).json({
         ok: true, queued: true,
         batch_id: batchId, event_type: eventType, details,

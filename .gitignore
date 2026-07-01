@@ -28,3 +28,6 @@ qr-lib/
 selector-check/
 zavu/**/.env
 zavu/**/.zavu/credentials.json
+
+.claude
+.agents

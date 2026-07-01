@@ -547,4 +547,16 @@ Action: run .\scripts\final-demo-check.ps1 -BaseUrl "https://aidtrace-rastroayud
 Action: manually verify browser offline path, Telegram path, Timeline, and Celoscan Logs.
 Acceptance: browser offline path, Telegram path, Celo tx link, Timeline, and Celoscan Logs all pass.
 Last verified deployed: final-demo-check.ps1 passed.
+
+P2-06 - Invent WhatsApp/SMS channel adapter
+Status: implementation complete; pending smoke check (scripts/invent-smoke-check.ps1).
+Why: reaches field workers using WhatsApp/SMS instead of Telegram — the majority in Venezuela.
+Files: api/invent.mjs, api/invent-notify.mjs, api/aidtrace-parser.mjs (parseAidTraceCommand),
+       api/zavu.mjs (_processInventQueueRow dispatch), test/invent-channel.test.mjs,
+       .github/workflows/ci-invent.yml, scripts/invent-setup.md, scripts/invent-smoke-check.ps1.
+Env: AIDTRACE_INVENT_WEBHOOK_TOKEN, AIDTRACE_INVENT_API_KEY.
+Action: follow scripts/invent-setup.md to connect WhatsApp Business in Invent and configure the HTTP action.
+Action: set AIDTRACE_INVENT_WEBHOOK_TOKEN and AIDTRACE_INVENT_API_KEY in Vercel environment.
+Action: run .\scripts\invent-smoke-check.ps1 -BaseUrl "https://aidtrace-rastroayuda.vercel.app" after deploy.
+Acceptance: smoke check 6/6 pass; WhatsApp custody command queued → Celo tx → final reply received in chat.
 ```

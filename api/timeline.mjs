@@ -246,11 +246,10 @@ async function upsertIndexedEvents(events) {
   });
 }
 
-async function loadIndexedTimeline(limit, cursor) {
-  const rows = await supabaseRequest(
-    `aidtrace_timeline_events?contract_address=eq.${encodeURIComponent(NORMALIZED_CONTRACT_ADDRESS)}&select=*&order=block_number.desc,log_index.desc&limit=${limit + 1}&offset=${cursor}`,
-  );
-
+async function loadIndexedTimeline(limit, cursor, batch = null) {
+  let path = `aidtrace_timeline_events?contract_address=eq.${encodeURIComponent(NORMALIZED_CONTRACT_ADDRESS)}&select=*&order=block_number.desc,log_index.desc&limit=${limit + 1}&offset=${cursor}`;
+  if (batch) path += `&batch_id=eq.${encodeURIComponent(batch)}`;
+  const rows = await supabaseRequest(path);
   return Array.isArray(rows) ? rows.map(timelineRowToEvent) : [];
 }
 
@@ -302,19 +301,21 @@ export default async function handler(req, res) {
   try {
     const limit = Math.min(Number(req.query.limit || 50), 100);
     const cursor = pageCursor(req.query.cursor);
+    const batch = req.query.batch ? String(req.query.batch).toUpperCase() : null;
     const fromBlock = await timelineFromBlock();
     let events;
     let index = null;
 
     if (hasSupabaseTimeline()) {
       index = await indexNewTimelineEvents(fromBlock);
-      events = await loadIndexedTimeline(limit, cursor);
+      events = await loadIndexedTimeline(limit, cursor, batch);
     } else {
       const logs = await getAidTraceLogs(fromBlock);
       const orderedEvents = (await buildEventsFromLogs(logs)).sort(
         (a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex,
       );
-      events = orderedEvents.slice(cursor, cursor + limit + 1);
+      const filtered = batch ? orderedEvents.filter((e) => e.batchId === batch) : orderedEvents;
+      events = filtered.slice(cursor, cursor + limit + 1);
     }
 
     const hasMore = events.length > limit;

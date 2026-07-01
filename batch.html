@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#eef6f1" />
+    <title>AidTrace — Lote</title>
+    <meta name="description" content="Cadena de custodia verificada en Celo para este lote de ayuda humanitaria." />
+    <meta property="og:title" content="AidTrace — Auditoría de lote" />
+    <meta property="og:description" content="Cadena de custodia verificada en Celo para este lote de ayuda humanitaria." />
+    <meta property="og:type" content="website" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      :root {
+        --green: #2f6f5a; --green-light: #eef6f1; --green-mid: #3f7763;
+        --blue: #6d8fa3; --amber: #d8a657; --red: #c0392b;
+        --border: #d0ddd7; --text: #1a2e25; --muted: #5a7a6a;
+        --radius: 10px; --font: system-ui, -apple-system, sans-serif;
+      }
+      body { font-family: var(--font); background: var(--green-light); color: var(--text); min-height: 100vh; padding: 0 0 60px; }
+      a { color: var(--green); }
+
+      .page-header { background: var(--green); color: #fff; padding: 20px 20px 16px; }
+      .page-header h1 { font-size: 18px; font-weight: 600; }
+      .page-header .eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; margin-bottom: 4px; }
+      .page-header .batch-code { font-size: 22px; font-weight: 700; letter-spacing: .04em; margin: 8px 0 4px; }
+      .page-header .sub { font-size: 13px; opacity: .8; }
+
+      .container { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+
+      .card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin: 16px 0; }
+      .card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+
+      .share-row { display: flex; gap: 8px; align-items: center; }
+      .share-url { flex: 1; font-size: 13px; color: var(--muted); background: var(--green-light); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .copy-btn { flex-shrink: 0; background: var(--green); color: #fff; border: none; border-radius: 6px; padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer; }
+      .copy-btn:active { opacity: .85; }
+
+      .celoscan-btn { display: block; text-align: center; background: var(--green); color: #fff; border-radius: var(--radius); padding: 13px; font-size: 14px; font-weight: 600; text-decoration: none; margin: 16px 0; }
+      .celoscan-btn:hover { opacity: .9; }
+
+      .event-list { list-style: none; }
+      .event-item { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+      .event-item:last-child { border-bottom: none; }
+      .event-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+      .dot-DELIVER { background: var(--green-mid); }
+      .dot-PICKUP  { background: var(--blue); }
+      .dot-REVIEW  { background: var(--amber); }
+      .dot-default { background: var(--border); }
+      .event-body { flex: 1; min-width: 0; }
+      .event-action { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+      .action-DELIVER { color: var(--green-mid); }
+      .action-PICKUP  { color: var(--blue); }
+      .action-REVIEW  { color: var(--amber); }
+      .event-details { font-size: 14px; color: var(--text); margin: 3px 0; line-height: 1.45; }
+      .event-meta { font-size: 12px; color: var(--muted); }
+      .event-tx { font-size: 11px; margin-top: 4px; }
+      .event-tx a { color: var(--blue); text-decoration: none; }
+      .event-tx a:hover { text-decoration: underline; }
+
+      .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+      .badge-green { background: #d4edda; color: #155724; }
+      .badge-blue  { background: #d0e8f5; color: #1a4a6b; }
+      .badge-amber { background: #fef3cd; color: #7d5a00; }
+
+      .state-msg { text-align: center; padding: 48px 16px; color: var(--muted); font-size: 14px; }
+      .state-msg .icon { font-size: 32px; margin-bottom: 10px; }
+
+      .source-tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 10px; background: #f0f4f2; color: var(--muted); margin-left: 6px; vertical-align: middle; text-transform: capitalize; }
+
+      @media print {
+        .copy-btn, .share-row { display: none; }
+        body { background: #fff; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-header">
+      <p class="eyebrow">AidTrace · RastroAyuda</p>
+      <h1>Auditoría de lote</h1>
+      <p class="batch-code" id="batchCodeDisplay">—</p>
+      <p class="sub" id="batchSub">Cadena de custodia verificada en Celo</p>
+    </div>
+
+    <div class="container">
+      <div class="card" id="shareCard" hidden>
+        <p class="card-title">Compartir esta auditoría</p>
+        <div class="share-row">
+          <span class="share-url" id="shareUrl"></span>
+          <button class="copy-btn" id="copyBtn" type="button">Copiar</button>
+        </div>
+      </div>
+
+      <a class="celoscan-btn" id="celoscanBtn" href="#" target="_blank" rel="noopener noreferrer" hidden>
+        Verificar contrato en Celoscan →
+      </a>
+
+      <div class="card">
+        <p class="card-title">Eventos de custodia</p>
+        <div id="eventRoot">
+          <div class="state-msg"><div class="icon">⏳</div>Cargando...</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CONTRACT = '0xaf5c40e82ac9255479a1f447e81992b71c4f4934';
+      const CELOSCAN_BASE = 'https://celoscan.io';
+
+      function getCode() {
+        const params = new URLSearchParams(location.search);
+        return (params.get('code') || '').toUpperCase().trim();
+      }
+
+      function actionLabel(type) {
+        const map = { DELIVER: 'Entrega', PICKUP: 'Recogida', REVIEW: 'Revisión' };
+        return map[type] || type;
+      }
+
+      function dotClass(type) {
+        return ['DELIVER','PICKUP','REVIEW'].includes(type) ? `dot-${type}` : 'dot-default';
+      }
+
+      function actionClass(type) {
+        return ['DELIVER','PICKUP','REVIEW'].includes(type) ? `action-${type}` : '';
+      }
+
+      function fmt(ts) {
+        if (!ts) return '';
+        try { return new Date(ts).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }); }
+        catch { return ts; }
+      }
+
+      function renderEvent(ev) {
+        const source = ev.source || ev.referenceURI?.split(':')[0] || '';
+        const sourceTag = source ? `<span class="source-tag">${source}</span>` : '';
+        const txUrl = ev.txUrl || (ev.txHash ? `${CELOSCAN_BASE}/tx/${ev.txHash}` : null);
+        const txLink = txUrl
+          ? `<div class="event-tx"><a href="${txUrl}" target="_blank" rel="noopener">Tx: ${ev.txHash?.slice(0,12)}…</a></div>`
+          : '';
+        return `
+          <li class="event-item">
+            <div class="event-dot ${dotClass(ev.actionType)}"></div>
+            <div class="event-body">
+              <div class="event-action ${actionClass(ev.actionType)}">${actionLabel(ev.actionType)}${sourceTag}</div>
+              <div class="event-details">${ev.details || ev.referenceURI || '—'}</div>
+              <div class="event-meta">${fmt(ev.blockTimestamp)}</div>
+              ${txLink}
+            </div>
+          </li>`;
+      }
+
+      async function load() {
+        const code = getCode();
+        if (!code) {
+          document.getElementById('eventRoot').innerHTML =
+            '<div class="state-msg"><div class="icon">❓</div>No se especificó un código de lote.</div>';
+          return;
+        }
+
+        document.getElementById('batchCodeDisplay').textContent = code;
+        document.title = `AidTrace — ${code}`;
+        document.querySelector('meta[property="og:title"]').content = `AidTrace — Lote ${code}`;
+
+        document.getElementById('shareCard').hidden = false;
+        const shareUrl = `${location.origin}/batch/${code}`;
+        document.getElementById('shareUrl').textContent = shareUrl;
+        document.getElementById('copyBtn').addEventListener('click', () => {
+          navigator.clipboard.writeText(shareUrl).then(() => {
+            document.getElementById('copyBtn').textContent = '✓ Copiado';
+            setTimeout(() => { document.getElementById('copyBtn').textContent = 'Copiar'; }, 2000);
+          });
+        });
+
+        const celoscanBtn = document.getElementById('celoscanBtn');
+        celoscanBtn.href = `${CELOSCAN_BASE}/address/${CONTRACT}`;
+        celoscanBtn.hidden = false;
+
+        try {
+          const res = await fetch(`/api/timeline?batch=${encodeURIComponent(code)}&limit=100`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data = await res.json();
+          const events = (data.events || []).slice().reverse();
+
+          if (!events.length) {
+            document.getElementById('eventRoot').innerHTML =
+              '<div class="state-msg"><div class="icon">📭</div>No se encontraron eventos para este lote.<br><small>Puede que aún no esté indexado. Intenta en unos minutos.</small></div>';
+            return;
+          }
+
+          document.getElementById('batchSub').textContent =
+            `${events.length} evento${events.length !== 1 ? 's' : ''} · Verificado en Celo`;
+
+          document.getElementById('eventRoot').innerHTML =
+            `<ul class="event-list">${events.map(renderEvent).join('')}</ul>`;
+        } catch (err) {
+          document.getElementById('eventRoot').innerHTML =
+            `<div class="state-msg"><div class="icon">⚠️</div>Error al cargar: ${err.message}</div>`;
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>

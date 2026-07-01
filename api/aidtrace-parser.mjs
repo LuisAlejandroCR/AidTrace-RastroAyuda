@@ -105,3 +105,12 @@ export function parseAidTraceText(text, options = {}) {
     alias: aliasMatch ? parts.slice(aliasIndex, aliasIndex + aliasMatch.width).join(" ").toUpperCase() : undefined,
   };
 }
+
+export function parseAidTraceCommand(text) {
+  try {
+    const r = parseAidTraceText(text);
+    return { batchId: r.batchId, eventType: r.actionType, details: r.details };
+  } catch {
+    return null;
+  }
+}

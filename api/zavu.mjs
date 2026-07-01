@@ -650,9 +650,64 @@ export function buildSuccessReply(parsed, txHash) {
   ].join("\n");
 }
 
+async function _processInventQueueRow(row) {
+  const p = row.payload || {};
+  const batchId      = p.batchId      || row.batch_id    || "UNKNOWN";
+  const eventType    = p.eventType    || row.action_type || "DELIVER";
+  const details      = p.details      || row.details     || "sin detalles";
+  const referenceURI = p.referenceURI || "";
+  const chatId       = p.chatId       || null;
+  const channelType  = String(row.channel || "").replace("invent_", "");
+
+  const parsed  = { actionType: eventType, batchId, details };
+  const data    = { channel: row.channel, from: row.source, messageId: row.inbound_message_id };
+  const event   = { id: row.inbound_message_id };
+  const options = { source: "invent", messageId: row.inbound_message_id, referenceURI };
+
+  try {
+    const result = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed, options));
+    await completeAidTraceMessage(row.id, result.txHash);
+
+    if (chatId && process.env.AIDTRACE_INVENT_API_KEY) {
+      try {
+        const { sendInventReply, buildFinalReply } = await import("./invent-notify.mjs");
+        const text = buildFinalReply({ batchId, eventType, details, txHash: result.txHash, channel: channelType });
+        await sendInventReply({ chatId, text });
+        console.info("[invent] reply sent to chat", chatId);
+      } catch (replyErr) {
+        console.warn("[invent] WhatsApp reply failed, trying Telegram fallback:", replyErr.message);
+        const fallbackChat = process.env.AIDTRACE_INVENT_FALLBACK_ZAVU_CHAT;
+        if (fallbackChat) {
+          try {
+            await zavu.messages.send({
+              to: fallbackChat,
+              channel: "telegram",
+              text: buildSuccessReply({ actionType: eventType, batchId, details }, result.txHash),
+              idempotencyKey: `aidtrace-invent-fallback-${row.inbound_message_id}`,
+            });
+            console.info("[invent] Telegram fallback sent to", fallbackChat);
+          } catch (fallbackErr) {
+            console.warn("[invent] Telegram fallback also failed:", fallbackErr.message);
+          }
+        }
+      }
+    }
+
+    return { ok: true, processed: true, id: row.id, txHash: result.txHash };
+  } catch (error) {
+    console.error("[invent] queue row failed:", row.id, error);
+    await retryAidTraceMessage(row.id, error);
+    return { ok: false, processed: true, id: row.id, error: "Invent message failed" };
+  }
+}
+
 export async function processQueuedAidTraceMessage(workerId = QUEUE_WORKER_ID) {
   const row = await claimAidTraceMessage(workerId);
   if (!row) return { ok: true, processed: false };
+
+  if (row.channel?.startsWith("invent_")) {
+    return _processInventQueueRow(row);
+  }
 
   try {
     const payload = row.payload || {};
