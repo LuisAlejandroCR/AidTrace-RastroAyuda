@@ -548,6 +548,19 @@ Action: manually verify browser offline path, Telegram path, Timeline, and Celos
 Acceptance: browser offline path, Telegram path, Celo tx link, Timeline, and Celoscan Logs all pass.
 Last verified deployed: final-demo-check.ps1 passed.
 
+P2-07 - Center inventory integration
+Status: implementation complete; pending supabase/center_inventory.sql execution and optional AIDTRACE_CENTER_WEBHOOK_URL setup.
+Why: makes AidTrace the proof backend for supply-center inventory systems; closes the audit gap noted by the hackathon review ("blockchain traceability layer that complements shelter-mapping projects").
+Files: api/zavu.mjs (parseCenterCode, emitCenterDelivery hooked in all 4 write paths),
+       api/center-inventory.mjs (GET /api/center-inventory?center=CENTRO-NORTE-1),
+       supabase/center_inventory.sql (aidtrace_center_inventory table + record_center_delivery RPC).
+Env: AIDTRACE_CENTER_WEBHOOK_URL (optional) — POST target for external systems (e.g. VnzlCentrosDeInsumos).
+Center code detection: regex /\b(CENTRO|CENTER|CC|DIST)-[\w-]{2,30}\b/i matched against event details, locationText, and batchId.
+Accepted action types: DELIVERED, DELIVER, ARRIVED.
+Action: run supabase/center_inventory.sql in Supabase SQL editor.
+Action: optionally set AIDTRACE_CENTER_WEBHOOK_URL in Vercel to receive webhooks on each delivery.
+Acceptance: send a Telegram or WhatsApp message: "CELO1 entregar 50 cajas CENTRO-NORTE-1" → Celo tx recorded → GET /api/center-inventory?center=CENTRO-NORTE-1 returns the delivery row with txHash.
+
 P2-06 - Invent WhatsApp/SMS channel adapter
 Status: implementation complete; pending smoke check (scripts/invent-smoke-check.ps1).
 Why: reaches field workers using WhatsApp/SMS instead of Telegram — the majority in Venezuela.

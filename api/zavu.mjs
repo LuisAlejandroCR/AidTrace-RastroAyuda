@@ -49,6 +49,7 @@ const BROWSER_RELAY_RATE_LIMIT = Number(process.env.AIDTRACE_BROWSER_RELAY_RATE_
 const QUEUE_WORKER_ID = process.env.AIDTRACE_QUEUE_WORKER_ID || "aidtrace-vercel-worker";
 const QUEUE_PROCESS_ON_INBOUND = process.env.AIDTRACE_QUEUE_PROCESS_ON_INBOUND !== "false";
 const QUEUE_INBOUND_PROCESS_LIMIT = Math.max(1, Number(process.env.AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT || "2"));
+const CENTER_WEBHOOK_URL = process.env.AIDTRACE_CENTER_WEBHOOK_URL || "";
 let celoWriteQueue = Promise.resolve();
 
 const abi = [
@@ -611,6 +612,7 @@ async function handleBrowserRelay(packet, req, res) {
         actionType: parsed.actionType,
         txHash: result.txHash,
       });
+      emitCenterDelivery({ batchId: parsed.batchId, actionType: parsed.actionType, details: parsed.details, locationText: item.locationText, txHash: result.txHash }).catch(() => {});
 
       if (guardStarted) {
         await completeBrowserRelayEvent(item.id, result.txHash);
@@ -650,6 +652,70 @@ export function buildSuccessReply(parsed, txHash) {
   ].join("\n");
 }
 
+const CENTER_CODE_RE = /\b((?:CENTRO|CENTER|CC|DIST)-[\w-]{2,30})\b/i;
+const CENTER_DELIVERY_ACTIONS = new Set(["DELIVERED", "DELIVER", "ARRIVED"]);
+
+function parseCenterCode(...texts) {
+  for (const text of texts) {
+    const m = String(text || "").match(CENTER_CODE_RE);
+    if (m) return m[1].toUpperCase();
+  }
+  return null;
+}
+
+async function emitCenterDelivery({ batchId, actionType, details, locationText, txHash }) {
+  if (!CENTER_DELIVERY_ACTIONS.has(String(actionType || "").toUpperCase())) return;
+  const centerCode = parseCenterCode(details, locationText, batchId);
+  if (!centerCode) return;
+
+  const payload = {
+    event:      "center.delivery",
+    centerCode,
+    batchId:    String(batchId || ""),
+    actionType: String(actionType || "").toUpperCase(),
+    details:    String(details || ""),
+    txHash:     txHash || null,
+    recordedAt: new Date().toISOString(),
+  };
+
+  if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/record_center_delivery`, {
+        method: "POST",
+        headers: {
+          "Content-Type":  "application/json",
+          apikey:          SUPABASE_SERVICE_ROLE_KEY,
+          Authorization:   `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          p_center_code:  centerCode,
+          p_batch_id:     payload.batchId,
+          p_action_type:  payload.actionType,
+          p_details:      payload.details,
+          p_tx_hash:      payload.txHash,
+        }),
+      });
+      if (!r.ok) console.warn("[center] Supabase upsert status:", r.status);
+      else console.info("[center] delivery recorded:", centerCode, batchId);
+    } catch (err) {
+      console.warn("[center] Supabase write failed:", err.message);
+    }
+  }
+
+  if (CENTER_WEBHOOK_URL) {
+    try {
+      await fetch(CENTER_WEBHOOK_URL, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+      console.info("[center] webhook emitted:", centerCode);
+    } catch (err) {
+      console.warn("[center] webhook failed:", err.message);
+    }
+  }
+}
+
 async function _processInventQueueRow(row) {
   const p = row.payload || {};
   const batchId      = p.batchId      || row.batch_id    || "UNKNOWN";
@@ -667,6 +733,7 @@ async function _processInventQueueRow(row) {
   try {
     const result = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed, options));
     await completeAidTraceMessage(row.id, result.txHash);
+    emitCenterDelivery({ batchId, actionType: eventType, details, locationText: "", txHash: result.txHash }).catch(() => {});
 
     if (chatId && process.env.AIDTRACE_INVENT_API_KEY) {
       try {
@@ -729,6 +796,7 @@ export async function processQueuedAidTraceMessage(workerId = QUEUE_WORKER_ID) {
 
     const result = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed, options));
     await completeAidTraceMessage(row.id, result.txHash);
+    emitCenterDelivery({ batchId: parsed.batchId, actionType: parsed.actionType, details: parsed.details, locationText: "", txHash: result.txHash }).catch(() => {});
 
     if (payload.replyTo && payload.replyChannel) {
       await zavu.messages.send({
@@ -851,6 +919,7 @@ export default async function handler(req, res) {
         queuedMessageId = messageId;
       } else {
         const { messageId, txHash } = await enqueueCeloWrite(() => recordOnCelo(event, data, parsed));
+        emitCenterDelivery({ batchId: parsed.batchId, actionType: parsed.actionType, details: parsed.details, locationText: "", txHash }).catch(() => {});
         replyText = buildSuccessReply(parsed, txHash);
         idempotencyKey = `aidtrace-reply-${messageId}`;
       }
