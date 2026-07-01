@@ -737,6 +737,94 @@ dd {
   line-height: 1.4;
 }
 
+/* Timeline toolbar: filter + view toggle */
+.timeline-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.tvt-btn {
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.tvt-btn.is-active {
+  background: var(--sage-dark, #2e7d55);
+  border-color: var(--sage-dark, #2e7d55);
+  color: #fff;
+}
+
+/* List / Map view switching */
+#screen-timeline .timeline-list-wrap { display: block; }
+#screen-timeline .timeline-map-wrap  { display: none; }
+#screen-timeline.view-map .timeline-list-wrap { display: none; }
+#screen-timeline.view-map .timeline-map-wrap  { display: block; }
+#screen-timeline.view-map .back-to-top { display: none; }
+
+/* No-GPS compact summary */
+.nocoord-summary {
+  margin-top: 10px;
+}
+
+.nocoord-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.nocoord-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.nocoord-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--line);
+  border-left: 3px solid #9ab9aa;
+  border-radius: 8px;
+}
+
+.nocoord-chip-label {
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.nocoord-chip-count {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.nocoord-see-list {
+  width: 100%;
+}
+
 /* Update screen filter bar */
 .update-filter-bar {
   display: flex;

@@ -36,14 +36,13 @@
         </div>
         <p class="subhead" data-i18n="subhead">RastroAyuda: calm, verifiable custody for humanitarian supplies.</p>
       </div>
-      <button id="languageToggle" class="language-button" type="button">Cambiar a inglés</button>      
+      <button id="languageToggle" class="language-button" type="button">Cambiar a inglés</button>
     </header>
 
     <nav class="tabbar" aria-label="App screens">
       <button class="tab is-active" type="button" data-screen-target="create" data-i18n="navCreate">Create</button>
       <button class="tab" type="button" data-screen-target="update" data-i18n="navUpdate">Update</button>
       <button class="tab" type="button" data-screen-target="timeline"><span data-i18n="navTimeline">Timeline</span><span id="pendingBadge" class="tab-badge" aria-label="unsynced events"></span></button>
-      <button class="tab" type="button" data-screen-target="map" data-i18n="navMap">Map</button>
     </nav>
 
     <main class="screen-shell">
@@ -95,12 +94,12 @@
           <input id="updateFilterText" type="search" class="update-filter-input" data-i18n-placeholder="filterBatchPlaceholder" placeholder="Search batch ID…" autocomplete="off" />
           <select id="updateFilterAction" class="update-filter-select">
             <option value="" data-i18n="filterAllActions">All actions</option>
-            <option value="PICKED_UP" data-i18n="pickedUp">Picked up</option>
-            <option value="ARRIVED" data-i18n="arrived">Arrived</option>
-            <option value="DELIVERED" data-i18n="delivered">Delivered</option>
-            <option value="DAMAGED" data-i18n="damaged">Damaged</option>
-            <option value="NEEDS_REVIEW" data-i18n="needsReview">Needs review</option>
-            <option value="SMS_CONFIRMED" data-i18n="smsConfirmed">Verified</option>
+            <option value="PICKED_UP" data-i18n="actionPickedUp">Picked up</option>
+            <option value="ARRIVED" data-i18n="actionArrived">Arrived</option>
+            <option value="DELIVERED" data-i18n="actionDelivered">Delivered</option>
+            <option value="DAMAGED" data-i18n="actionDamaged">Damaged</option>
+            <option value="NEEDS_REVIEW" data-i18n="actionNeedsReview">Needs review</option>
+            <option value="SMS_CONFIRMED" data-i18n="actionSmsConfirmed">Verified</option>
           </select>
         </div>
         <ul id="updateFilterResults" class="update-filter-results" hidden></ul>
@@ -112,12 +111,12 @@
           <label>
             <span data-i18n="action">Action</span>
             <select id="actionType" required>
-              <option value="PICKED_UP" data-i18n="pickedUp">Picked up</option>
-              <option value="ARRIVED" data-i18n="arrived">Arrived</option>
-              <option value="DELIVERED" data-i18n="delivered">Delivered</option>
-              <option value="DAMAGED" data-i18n="damaged">Damaged</option>
-              <option value="NEEDS_REVIEW" data-i18n="needsReview">Needs review</option>
-              <option value="SMS_CONFIRMED" data-i18n="smsConfirmed">Verified</option>
+              <option value="PICKED_UP" data-i18n="actionPickedUp">Picked up</option>
+              <option value="ARRIVED" data-i18n="actionArrived">Arrived</option>
+              <option value="DELIVERED" data-i18n="actionDelivered">Delivered</option>
+              <option value="DAMAGED" data-i18n="actionDamaged">Damaged</option>
+              <option value="NEEDS_REVIEW" data-i18n="actionNeedsReview">Needs review</option>
+              <option value="SMS_CONFIRMED" data-i18n="actionSmsConfirmed">Verified</option>
             </select>
           </label>
           <label>
@@ -140,7 +139,7 @@
         </form>
       </section>
 
-      <section id="screen-timeline" class="screen" aria-labelledby="timeline-title">
+      <section id="screen-timeline" class="screen view-list" aria-labelledby="timeline-title">
         <div class="screen-head split">
           <div>
             <p class="eyebrow" data-i18n="timelineEyebrow">Supervisor</p>
@@ -148,28 +147,47 @@
             <p id="queueState">0 pending</p>
           </div>
         </div>
-        <div class="timeline-controls" data-timeline-controls hidden>
-          <span data-timeline-count></span>
-          <div class="pagination" data-timeline-pages></div>
+
+        <!-- Shared filter bar + view toggle -->
+        <div class="timeline-toolbar panel">
+          <input id="timelineFilterText" type="search" class="update-filter-input" data-i18n-placeholder="filterBatchPlaceholder" placeholder="Search batch ID…" autocomplete="off" />
+          <select id="timelineFilterAction" class="update-filter-select">
+            <option value="" data-i18n="filterAllActions">All actions</option>
+            <option value="PICKED_UP" data-i18n="actionPickedUp">Picked up</option>
+            <option value="ARRIVED" data-i18n="actionArrived">Arrived</option>
+            <option value="DELIVERED" data-i18n="actionDelivered">Delivered</option>
+            <option value="DAMAGED" data-i18n="actionDamaged">Damaged</option>
+            <option value="NEEDS_REVIEW" data-i18n="actionNeedsReview">Needs review</option>
+            <option value="SMS_CONFIRMED" data-i18n="actionSmsConfirmed">Verified</option>
+          </select>
+          <div class="view-toggle" role="group" aria-label="View mode">
+            <button id="viewListBtn" class="tvt-btn is-active" type="button" aria-pressed="true" data-i18n="viewList">List</button>
+            <button id="viewMapBtn" class="tvt-btn" type="button" aria-pressed="false" data-i18n="viewMap">Map</button>
+          </div>
         </div>
-        <div id="timeline" class="timeline" aria-live="polite"></div>
-        <div class="timeline-controls bottom" data-timeline-controls hidden>
-          <span data-timeline-count></span>
-          <div class="pagination" data-timeline-pages></div>
+
+        <!-- LIST VIEW -->
+        <div class="timeline-list-wrap">
+          <div class="timeline-controls" data-timeline-controls hidden>
+            <span data-timeline-count></span>
+            <div class="pagination" data-timeline-pages></div>
+          </div>
+          <div id="timeline" class="timeline" aria-live="polite"></div>
+          <div class="timeline-controls bottom" data-timeline-controls hidden>
+            <span data-timeline-count></span>
+            <div class="pagination" data-timeline-pages></div>
+          </div>
         </div>
+
+        <!-- MAP VIEW -->
+        <div class="timeline-map-wrap">
+          <div id="map-container"></div>
+          <div id="map-nocoord-summary"></div>
+          <div id="centersPanel" class="centers-panel"></div>
+        </div>
+
         <button class="back-to-top" type="button" data-timeline-top aria-label="Back to top">↑</button>
         <div id="failedJobsPanel" class="failed-jobs-panel" hidden></div>
-      </section>
-
-      <section id="screen-map" class="screen" aria-labelledby="map-title">
-        <div class="screen-head">
-          <p class="eyebrow" data-i18n="mapEyebrow">Field map</p>
-          <h2 id="map-title" data-i18n="mapTitle">Custody map</h2>
-          <p data-i18n="mapIntro">Events with GPS location appear as markers. Tap a marker for details.</p>
-        </div>
-        <div id="map-container"></div>
-        <div id="map-nocoord-list"></div>
-        <div id="centersPanel" class="centers-panel"></div>
       </section>
 
       <p id="networkState" class="visually-hidden">Offline ready</p>

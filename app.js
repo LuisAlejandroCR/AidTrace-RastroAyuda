@@ -118,6 +118,9 @@ const translations = {
     gpsCapturing: "📍 Locating…",
     gpsCaptured: "📍 Location set",
     mapEventsWithoutLocation: "Events without GPS",
+    noGpsSeeList: "View in list →",
+    viewList: "📋 List",
+    viewMap: "🗺️ Map",
     centersTitle: "Distribution centers",
     centersLastDelivery: "Last delivery",
     centersTotal: "deliveries",
@@ -231,6 +234,9 @@ const translations = {
     gpsCapturing: "📍 Localizando…",
     gpsCaptured: "📍 Ubicacion lista",
     mapEventsWithoutLocation: "Eventos sin GPS",
+    noGpsSeeList: "Ver en lista →",
+    viewList: "📋 Lista",
+    viewMap: "🗺️ Mapa",
     centersTitle: "Centros de distribución",
     centersLastDelivery: "Última entrega",
     centersTotal: "entregas",
@@ -262,6 +268,8 @@ const defaultState = {
 
 let state = loadState();
 let timelinePage = 1;
+let timelineView = "list";
+let timelineFilter = { text: "", action: "" };
 const qrPrintLinks = new Map();
 const $ = (id) => document.getElementById(id);
 
@@ -843,15 +851,74 @@ function renderFailedJobs(data) {
   });
 }
 
+function getFilteredEvents() {
+  const { text, action } = timelineFilter;
+  if (!text && !action) return state.events;
+  return state.events.filter((ev) => {
+    const batchMatch = !text || String(ev.batchId || "").toLowerCase().includes(text);
+    const actionMatch = !action || ev.actionType === action;
+    return batchMatch && actionMatch;
+  });
+}
+
+function setTimelineView(view) {
+  timelineView = view;
+  const screen = $("screen-timeline");
+  if (screen) {
+    screen.classList.toggle("view-list", view === "list");
+    screen.classList.toggle("view-map", view === "map");
+  }
+  const listBtn = $("viewListBtn");
+  const mapBtn = $("viewMapBtn");
+  if (listBtn) { listBtn.classList.toggle("is-active", view === "list"); listBtn.setAttribute("aria-pressed", String(view === "list")); }
+  if (mapBtn)  { mapBtn.classList.toggle("is-active", view === "map");  mapBtn.setAttribute("aria-pressed", String(view === "map")); }
+  if (view === "map")  { setTimeout(initMap, 50); setTimeout(fetchCenterSummary, 200); }
+  if (view === "list") setTimeout(fetchQueueStatus, 150);
+}
+
+function renderNoCoordSummary(filteredEvents) {
+  const summary = $("map-nocoord-summary");
+  if (!summary) return;
+  const noGeo = filteredEvents.filter((e) => e.lat == null || e.lon == null);
+  if (!noGeo.length) { summary.innerHTML = ""; return; }
+
+  const counts = {};
+  for (const ev of noGeo) counts[ev.actionType] = (counts[ev.actionType] || 0) + 1;
+
+  const chips = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([action, count]) => {
+      const color = MAP_ACTION_COLORS[action] || "#9ab9aa";
+      return `<div class="nocoord-chip" style="border-left-color:${color}">`
+        + `<span class="nocoord-chip-label">${actionLabel(action)}</span>`
+        + `<span class="nocoord-chip-count">${count}</span>`
+        + `</div>`;
+    }).join("");
+
+  summary.innerHTML = `<div class="nocoord-summary panel">`
+    + `<p class="nocoord-heading">${t("mapEventsWithoutLocation")} (${noGeo.length})</p>`
+    + `<div class="nocoord-grid">${chips}</div>`
+    + `<button class="secondary compact nocoord-see-list" id="nocoordSeeList" type="button">${t("noGpsSeeList")}</button>`
+    + `</div>`;
+
+  $("nocoordSeeList")?.addEventListener("click", () => setTimelineView("list"));
+}
+
 function showScreen(name) {
+  if (name === "map") {
+    name = "timeline";
+    setTimelineView("map");
+  }
   document.querySelectorAll(".screen").forEach((screen) => {
     screen.classList.toggle("is-active", screen.id === `screen-${name}`);
   });
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.classList.toggle("is-active", tab.dataset.screenTarget === name);
   });
-  if (name === "map") { setTimeout(initMap, 50); setTimeout(fetchCenterSummary, 200); }
-  if (name === "timeline") setTimeout(fetchQueueStatus, 150);
+  if (name === "timeline") {
+    if (timelineView === "map") { setTimeout(initMap, 50); setTimeout(fetchCenterSummary, 200); }
+    else setTimeout(fetchQueueStatus, 150);
+  }
 }
 
 const MAP_ACTION_COLORS = {
@@ -887,8 +954,8 @@ function renderMap() {
   if (!mapLayerGroup) return;
   mapLayerGroup.clearLayers();
 
-  const geoEvents = state.events.filter((e) => e.lat != null && e.lon != null);
-  const noGeoEvents = state.events.filter((e) => e.lat == null || e.lon == null);
+  const filteredEvents = getFilteredEvents();
+  const geoEvents = filteredEvents.filter((e) => e.lat != null && e.lon != null);
 
   const batchGroups = new Map();
   for (const ev of geoEvents) {
@@ -939,30 +1006,11 @@ function renderMap() {
     }
   }
 
-  const list = document.getElementById("map-nocoord-list");
-  if (!list) return;
-  if (!noGeoEvents.length) { list.innerHTML = ""; return; }
-  list.innerHTML = `<p class="map-nocoord-heading">${t("mapEventsWithoutLocation")} (${noGeoEvents.length})</p>`
-    + noGeoEvents.slice(0, 30).map((ev) => {
-      const color = MAP_ACTION_COLORS[ev.actionType] || "#9ab9aa";
-      const txLink = ev.txHash
-        ? `<a href="${NETWORK.txExplorer}/${ev.txHash}" target="_blank" rel="noreferrer">${t("txLink")}</a>`
-        : ev.status === "pending" ? `<span class="status-pending">⏳ ${t("statusPending")}</span>` : "";
-      const ts = eventTimestamp(ev) ? new Date(eventTimestamp(ev)).toLocaleString() : "";
-      return `<article class="timeline-item map-nocoord-card">`
-        + `<div class="tag" style="background:${color}22;border-color:${color}66">`
-        + `<span class="map-nocoord-dot" style="background:${color}"></span>`
-        + `<span>${ev.batchId}</span></div>`
-        + `<div><h3>${actionLabel(ev.actionType)}</h3>`
-        + `<p>${ev.locationText || ev.note || "—"}</p>`
-        + (ts ? `<p class="event-time">${ts}</p>` : "")
-        + (txLink ? `<small>${txLink}</small>` : "")
-        + `</div></article>`;
-    }).join("");
+  renderNoCoordSummary(filteredEvents);
 }
 
 function clampTimelinePage() {
-  const totalPages = Math.max(1, Math.ceil(state.events.length / TIMELINE_PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(getFilteredEvents().length / TIMELINE_PAGE_SIZE));
   timelinePage = Math.min(Math.max(1, timelinePage), totalPages);
   return totalPages;
 }
@@ -1007,21 +1055,24 @@ function render() {
   const timeline = $("timeline");
   const timelineControls = document.querySelectorAll("[data-timeline-controls]");
   timeline.textContent = "";
-  if (!state.events.length) {
-    timeline.innerHTML = `<p class="hint">${t("empty")}</p>`;
+  const filteredEvents = getFilteredEvents();
+  const isFiltered = timelineFilter.text || timelineFilter.action;
+  if (!filteredEvents.length) {
+    timeline.innerHTML = `<p class="hint">${isFiltered ? t("filterNoResults") : t("empty")}</p>`;
     timelineControls.forEach((controls) => controls.setAttribute("hidden", ""));
     return;
   }
 
   const totalPages = clampTimelinePage();
   const pageStart = (timelinePage - 1) * TIMELINE_PAGE_SIZE;
-  const pageEnd = Math.min(pageStart + TIMELINE_PAGE_SIZE, state.events.length);
-  const visibleEvents = state.events.slice(pageStart, pageEnd);
+  const pageEnd = Math.min(pageStart + TIMELINE_PAGE_SIZE, filteredEvents.length);
+  const visibleEvents = filteredEvents.slice(pageStart, pageEnd);
 
   timelineControls.forEach((controls) => {
     controls.removeAttribute("hidden");
+    const countSuffix = isFiltered ? ` / ${state.events.length}` : "";
     controls.querySelector("[data-timeline-count]").textContent =
-      `${t("timelineShowing")} ${pageStart + 1}-${pageEnd} ${t("timelineOf")} ${state.events.length}`;
+      `${t("timelineShowing")} ${pageStart + 1}-${pageEnd} ${t("timelineOf")} ${filteredEvents.length}${countSuffix}`;
     const pages = controls.querySelector("[data-timeline-pages]");
     pages.textContent = "";
     const previous = document.createElement("button");
@@ -1183,6 +1234,27 @@ $("gpsBtn")?.addEventListener("click", captureGps);
       resultsList.hidden = true;
     }
   });
+})();
+
+(function initTimelineFilter() {
+  const textInput = $("timelineFilterText");
+  const actionSel = $("timelineFilterAction");
+  const listBtn   = $("viewListBtn");
+  const mapBtn    = $("viewMapBtn");
+  if (!textInput || !actionSel) return;
+
+  function applyFilter() {
+    timelineFilter.text   = textInput.value.trim().toLowerCase();
+    timelineFilter.action = actionSel.value;
+    timelinePage = 1;
+    render();
+    if (timelineView === "map") renderMap();
+  }
+
+  textInput.addEventListener("input", applyFilter);
+  actionSel.addEventListener("change", applyFilter);
+  listBtn?.addEventListener("click", () => setTimelineView("list"));
+  mapBtn?.addEventListener("click",  () => setTimelineView("map"));
 })();
 
 $("languageToggle").addEventListener("click", () => {
