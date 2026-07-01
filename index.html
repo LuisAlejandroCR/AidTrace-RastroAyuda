@@ -5,8 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#eef6f1" />
     <title>AidTrace | RastroAyuda</title>
+    <meta name="description" content="Offline-first supply custody tracking with tamper-evident Celo blockchain proof. No wallet needed for field workers." />
+    <meta property="og:title" content="AidTrace | RastroAyuda" />
+    <meta property="og:description" content="Scan a QR label, record a handoff, get a Celoscan proof — no wallet, works offline. Humanitarian aid tracking on Celo." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://aidtrace-rastroayuda.vercel.app/assets/icons/icon-512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="AidTrace | RastroAyuda" />
+    <meta name="twitter:description" content="Tamper-evident aid supply tracking on Celo. No wallet needed." />
+    <meta name="twitter:image" content="https://aidtrace-rastroayuda.vercel.app/assets/icons/icon-512.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   </head>
   <body>
     <header class="app-header">
@@ -33,6 +43,7 @@
       <button class="tab is-active" type="button" data-screen-target="create" data-i18n="navCreate">Create</button>
       <button class="tab" type="button" data-screen-target="update" data-i18n="navUpdate">Update</button>
       <button class="tab" type="button" data-screen-target="timeline" data-i18n="navTimeline">Timeline</button>
+      <button class="tab" type="button" data-screen-target="map" data-i18n="navMap">Map</button>
     </nav>
 
     <main class="screen-shell">
@@ -102,7 +113,11 @@
           </label>
           <label>
             <span data-i18n="location">Location</span>
-            <input id="locationText" type="text" data-i18n-placeholder="locationPlaceholder" placeholder="Area or site name" required />
+            <div class="input-row">
+              <input id="locationText" type="text" data-i18n-placeholder="locationPlaceholder" placeholder="Area or site name" required />
+              <button id="gpsBtn" class="secondary compact" type="button" data-i18n="captureGpsButton">📍 GPS</button>
+            </div>
+            <small id="gpsDisplay" class="gps-display"></small>
           </label>
           <label class="wide">
             <span data-i18n="evidence">Evidence note</span>
@@ -132,6 +147,16 @@
         <button class="back-to-top" type="button" data-timeline-top aria-label="Back to top">↑</button>
       </section>
 
+      <section id="screen-map" class="screen" aria-labelledby="map-title">
+        <div class="screen-head">
+          <p class="eyebrow" data-i18n="mapEyebrow">Field map</p>
+          <h2 id="map-title" data-i18n="mapTitle">Custody map</h2>
+          <p data-i18n="mapIntro">Events with GPS location appear as markers. Tap a marker for details.</p>
+        </div>
+        <div id="map-container"></div>
+        <div id="map-nocoord-list"></div>
+      </section>
+
       <p id="networkState" class="visually-hidden">Offline ready</p>
     </main>
 
@@ -148,6 +173,7 @@
       </article>
     </template>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="./qrcode.js"></script>
     <script src="./app.js"></script>
   </body>

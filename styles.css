@@ -172,7 +172,7 @@ h2 {
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 10px clamp(12px, 4vw, 34px);
   background: rgba(238, 246, 241, 0.86);
@@ -655,6 +655,51 @@ dd {
     width: 36px;
     min-width: 36px;
   }
+}
+
+/* GPS capture row */
+.input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-row input {
+  width: auto;
+  flex: 1;
+}
+
+.input-row button {
+  flex-shrink: 0;
+}
+
+.gps-display {
+  color: var(--sage-dark);
+  font-size: 0.76rem;
+  font-weight: 600;
+  min-height: 16px;
+}
+
+/* Map screen */
+#map-container {
+  height: 360px;
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 0 0 12px;
+}
+
+.map-nocoord-heading {
+  font-size: 0.82rem;
+  font-weight: 850;
+  color: var(--muted);
+  margin: 16px 0 8px;
+}
+
+.map-nocoord-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -9,6 +9,9 @@ const STORE_KEY = "aidtrace_state_v4";
 const ONLINE_RELOAD_KEY = "aidtrace_reloaded_after_online";
 const TIMELINE_FETCH_LIMIT = 100;
 const TIMELINE_PAGE_SIZE = 10;
+let pendingGps = null;
+let mapInstance = null;
+let mapLayerGroup = null;
 
 const NETWORK = {
   name: "Celo Mainnet",
@@ -103,6 +106,14 @@ const translations = {
     actionDamaged: "Damaged",
     actionNeedsReview: "Needs review",
     actionSmsConfirmed: "Verified",
+    navMap: "Map",
+    mapEyebrow: "Field map",
+    mapTitle: "Custody map",
+    mapIntro: "Events with GPS location appear as markers. Tap a marker for details.",
+    captureGpsButton: "📍 GPS",
+    gpsCapturing: "📍 Locating…",
+    gpsCaptured: "📍 Location set",
+    mapEventsWithoutLocation: "Events without GPS",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -188,6 +199,14 @@ const translations = {
     actionDamaged: "Danado",
     actionNeedsReview: "Requiere revision",
     actionSmsConfirmed: "Verificado",
+    navMap: "Mapa",
+    mapEyebrow: "Mapa de campo",
+    mapTitle: "Mapa de custodia",
+    mapIntro: "Los eventos con GPS aparecen como marcadores. Toca para ver detalles.",
+    captureGpsButton: "📍 GPS",
+    gpsCapturing: "📍 Localizando…",
+    gpsCaptured: "📍 Ubicacion lista",
+    mapEventsWithoutLocation: "Eventos sin GPS",
   },
 };
 
@@ -500,9 +519,38 @@ async function createCustodyEvent(form) {
     locationText: form.locationText.value.trim(),
     note: form.eventNote.value.trim(),
     ref: `aidtrace://${form.eventBatchId.value.trim()}`,
+    ...(pendingGps ? { lat: pendingGps.lat, lon: pendingGps.lon } : {}),
   });
+  pendingGps = null;
+  const gpsDisplay = $("gpsDisplay");
+  if (gpsDisplay) gpsDisplay.textContent = "";
+  const gpsBtn = $("gpsBtn");
+  if (gpsBtn) gpsBtn.textContent = t("captureGpsButton");
   form.reset();
   showScreen("timeline");
+}
+
+function captureGps() {
+  if (!navigator.geolocation) {
+    notify(state.language === "es" ? "GPS no disponible en este dispositivo." : "GPS not available on this device.");
+    return;
+  }
+  const btn = $("gpsBtn");
+  const display = $("gpsDisplay");
+  if (btn) { btn.textContent = t("gpsCapturing"); btn.disabled = true; }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      pendingGps = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      if (display) display.textContent = `📍 ${pendingGps.lat.toFixed(4)}, ${pendingGps.lon.toFixed(4)}`;
+      if (btn) { btn.textContent = t("gpsCaptured"); btn.disabled = false; }
+    },
+    () => {
+      pendingGps = null;
+      if (display) display.textContent = "";
+      if (btn) { btn.textContent = t("captureGpsButton"); btn.disabled = false; }
+    },
+    { timeout: 8000, enableHighAccuracy: true },
+  );
 }
 
 function relayPacket() {
@@ -615,6 +663,104 @@ function showScreen(name) {
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.classList.toggle("is-active", tab.dataset.screenTarget === name);
   });
+  if (name === "map") setTimeout(initMap, 50);
+}
+
+const MAP_ACTION_COLORS = {
+  CREATED: "#9ab9aa",
+  PICKUP: "#6d8fa3",
+  PICKED_UP: "#6d8fa3",
+  ARRIVED: "#3f7763",
+  DELIVER: "#3f7763",
+  DELIVERED: "#3f7763",
+  DAMAGED: "#c0392b",
+  REVIEW: "#d8a657",
+  NEEDS_REVIEW: "#d8a657",
+  SMS_CONFIRMED: "#2e7d55",
+};
+
+function initMap() {
+  if (typeof L === "undefined") return;
+  const container = document.getElementById("map-container");
+  if (!container) return;
+  if (!mapInstance) {
+    mapInstance = L.map("map-container").setView([8.0, -66.5], 6);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18,
+    }).addTo(mapInstance);
+    mapLayerGroup = L.layerGroup().addTo(mapInstance);
+  }
+  mapInstance.invalidateSize();
+  renderMap();
+}
+
+function renderMap() {
+  if (!mapLayerGroup) return;
+  mapLayerGroup.clearLayers();
+
+  const geoEvents = state.events.filter((e) => e.lat != null && e.lon != null);
+  const noGeoEvents = state.events.filter((e) => e.lat == null || e.lon == null);
+
+  const batchGroups = new Map();
+  for (const ev of geoEvents) {
+    if (!batchGroups.has(ev.batchId)) batchGroups.set(ev.batchId, []);
+    batchGroups.get(ev.batchId).push(ev);
+  }
+
+  const palette = ["#3f7763", "#6d8fa3", "#d8a657", "#c0392b", "#8e44ad"];
+  let pi = 0;
+  const batchColor = new Map();
+  for (const [batchId] of batchGroups) {
+    batchColor.set(batchId, palette[pi % palette.length]);
+    pi++;
+  }
+
+  for (const [batchId, evs] of batchGroups) {
+    const sorted = [...evs].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    if (sorted.length > 1) {
+      L.polyline(sorted.map((e) => [e.lat, e.lon]), {
+        color: batchColor.get(batchId),
+        weight: 2,
+        dashArray: "5 5",
+        opacity: 0.65,
+      }).addTo(mapLayerGroup);
+    }
+    for (const ev of sorted) {
+      const color = MAP_ACTION_COLORS[ev.actionType] || batchColor.get(batchId) || "#888";
+      const marker = L.circleMarker([ev.lat, ev.lon], {
+        radius: 9,
+        color: "#fff",
+        fillColor: color,
+        fillOpacity: 0.9,
+        weight: 2,
+      });
+      const txLine = ev.txHash
+        ? `<a href="${NETWORK.txExplorer}/${ev.txHash}" target="_blank" rel="noreferrer">→ Celoscan</a>`
+        : ev.status === "pending"
+        ? `⏳ ${t("statusPending")}`
+        : "";
+      marker.bindPopup(
+        `<strong>${ev.batchId}</strong><br>${actionLabel(ev.actionType)} · ${statusLabel(ev.status)}`
+        + (ev.locationText ? `<br>${ev.locationText}` : "")
+        + (ev.note ? `<br><small>${ev.note}</small>` : "")
+        + (txLine ? `<br>${txLine}` : ""),
+        { maxWidth: 220 },
+      );
+      marker.addTo(mapLayerGroup);
+    }
+  }
+
+  const list = document.getElementById("map-nocoord-list");
+  if (!list) return;
+  if (!noGeoEvents.length) { list.innerHTML = ""; return; }
+  list.innerHTML = `<p class="map-nocoord-heading">${t("mapEventsWithoutLocation")} (${noGeoEvents.length})</p>`
+    + noGeoEvents.slice(0, 20).map((ev) =>
+      `<div class="map-nocoord-item"><strong>${ev.batchId}</strong> · ${actionLabel(ev.actionType)}`
+      + `<br><small>${ev.locationText || ev.note || "—"}</small>`
+      + (ev.txHash ? ` · <a href="${NETWORK.txExplorer}/${ev.txHash}" target="_blank" rel="noreferrer">Tx</a>` : "")
+      + `</div>`,
+    ).join("");
 }
 
 function clampTimelinePage() {
@@ -783,6 +929,8 @@ $("eventForm").addEventListener("submit", (event) => {
   event.preventDefault();
   createCustodyEvent(event.currentTarget);
 });
+
+$("gpsBtn")?.addEventListener("click", captureGps);
 
 $("languageToggle").addEventListener("click", () => {
   state.language = state.language === "en" ? "es" : "en";
