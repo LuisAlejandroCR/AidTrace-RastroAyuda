@@ -1,79 +1,59 @@
 /**
- * api/invent.mjs
+ * api/invent.mjs  — Invent channel adapter (WhatsApp + SMS)
  *
- * Invent channel adapter for AidTrace.
+ * DEPENDENCIES: only what is already in package.json
+ *   viem  — Celo writes (same as zavu.mjs)
+ *   fetch — built-in Node 18+, used for Supabase RPC (no @supabase/supabase-js needed)
  *
- * Invent is the platform (https://useinvent.com) that handles
- * WhatsApp Business and SMS channels.  When a field worker sends a
- * message on either channel, Invent delivers it here via an Action
- * configured in the Invent dashboard as "Call API endpoint".
+ * NO NEW PACKAGES REQUIRED. Drop this file into /api/ and redeploy.
  *
- * This endpoint:
- *   1. Authenticates the request with AIDTRACE_INVENT_WEBHOOK_TOKEN.
- *   2. Parses the natural-language custody command (same parser as Telegram).
- *   3. Enqueues the write in Supabase (same queue as Telegram/Zavu).
- *   4. Replies immediately with a human-readable acknowledgement.
- *   5. The GitHub Actions queue worker processes it and writes to Celo.
- *
- * Environment variables required:
- *   AIDTRACE_INVENT_WEBHOOK_TOKEN  – shared secret set in Invent Action config
- *   AIDTRACE_CONTRACT              – AidTraceLedger contract address
- *   SUPABASE_URL                   – Supabase project URL
- *   SUPABASE_SERVICE_ROLE_KEY      – Supabase service-role key
- *   AIDTRACE_QUEUE_ENABLED         – set "true" to use durable queue
- *   RASTROAYUDA_RELAYER_PRIVATE_KEY– hot relayer key (used when queue disabled)
- *
- * Invent Action configuration (in the Invent dashboard):
- *   Integration : HTTP Request (or "Call API endpoint")
- *   Method      : POST
- *   URL         : https://aidtrace-rastroayuda.vercel.app/api/invent
- *   Headers     : X-AidTrace-Invent-Token: <token>
- *   Body (JSON) :
- *     {
- *       "contact_id"  : "{{contact.id}}",
- *       "contact_name": "{{contact.name}}",
- *       "channel"     : "{{channel.type}}",   // "whatsapp" | "sms"
- *       "phone"       : "{{contact.phone}}",
- *       "message"     : "{{message.text}}"
- *     }
- *
- * The assistant's Instructions in Invent should include:
- *   "When a user sends a custody command (starting with CELO, LOTE, or AT-),
- *    call the Record Custody Event action immediately. Do not paraphrase or
- *    ask for confirmation. Pass the full original message as the 'message'
- *    field."
+ * Invent Action configuration:
+ *   URL    : https://aidtrace-rastroayuda.vercel.app/api/invent
+ *   Method : POST          ← change from GET
+ *   Headers: {"X-AidTrace-Invent-Token":"<your token>","Content-Type":"application/json"}
+ *   Body   : {"contact_id":"{{contact.id}}","contact_name":"{{contact.name}}",
+ *             "channel":"{{channel.type}}","phone":"{{contact.phone}}",
+ *             "message":"{{message.text}}"}
+ *              ← switch Body from "AI Controlled" to this exact raw JSON
  */
 
+import { createPublicClient, createWalletClient, http, encodeFunctionData } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import { parseAidTraceCommand } from './aidtrace-parser.mjs';
-import { createClient }          from '@supabase/supabase-js';
-import { ethers }                from 'ethers';
 
 // ---------------------------------------------------------------------------
-// Constants
+// Celo Mainnet config (mirrors zavu.mjs)
 // ---------------------------------------------------------------------------
 
-const ALLOWED_CHANNELS = new Set(['whatsapp', 'sms', 'whatsapp_business']);
+const celoMainnet = {
+  id: 42220,
+  name: 'Celo',
+  network: 'celo',
+  nativeCurrency: { name: 'CELO', symbol: 'CELO', decimals: 18 },
+  rpcUrls: { default: { http: ['https://forno.celo.org'] } },
+};
 
-// Minimal ABI — only the recordEvent function we call.
-const LEDGER_ABI = [
-  'function recordEvent(string batchId, string eventType, string details, string referenceURI) external',
-];
+const LEDGER_ABI = [{
+  name: 'recordEvent',
+  type: 'function',
+  stateMutability: 'nonpayable',
+  inputs: [
+    { name: 'batchId',      type: 'string' },
+    { name: 'eventType',    type: 'string' },
+    { name: 'details',      type: 'string' },
+    { name: 'referenceURI', type: 'string' },
+  ],
+  outputs: [],
+}];
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Auth
 // ---------------------------------------------------------------------------
 
-/**
- * Authenticate the inbound request using a shared token in the header.
- * Invent supports custom headers in Action configurations, so we can
- * always enforce this — unlike Zavu where header support was optional.
- */
 function authenticate(req) {
   const token = process.env.AIDTRACE_INVENT_WEBHOOK_TOKEN;
   if (!token) {
-    // Token not configured: skip auth (dev / first-deploy mode).
-    // Log a warning so the operator knows to set it.
-    console.warn('[invent] AIDTRACE_INVENT_WEBHOOK_TOKEN not set — skipping auth');
+    console.warn('[invent] AIDTRACE_INVENT_WEBHOOK_TOKEN not set — running without auth');
     return true;
   }
   const header =
@@ -82,77 +62,93 @@ function authenticate(req) {
   return header === token;
 }
 
-/**
- * Build a public audit memo that lands in the Celo transaction's
- * referenceURI field.  Mirrors the format used by the Telegram adapter.
- */
-function buildReferenceURI({ contactId, channel, batchId, eventType, details }) {
-  return `invent:${channel}:${contactId} | ${eventType} ${batchId} | ${details}`;
-}
+// ---------------------------------------------------------------------------
+// Supabase queue — raw fetch, no SDK needed
+// ---------------------------------------------------------------------------
 
-/**
- * Enqueue the custody event in Supabase for the GitHub Actions queue worker.
- * Returns the queue row on success, throws on error.
- */
-async function enqueue({ contactId, channel, phone, batchId, eventType, details, referenceURI }) {
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { persistSession: false } }
-  );
+async function enqueueSupabase({ contactId, channel, phone, batchId, eventType, details, referenceURI }) {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !supabaseKey) throw new Error('Supabase env vars not set');
 
-  // inbound_message_id ensures idempotency: duplicate deliveries from Invent
-  // produce a single queue row, not duplicate Celo writes.
   const inboundMessageId = `invent:${channel}:${contactId}:${batchId}:${eventType}:${Date.now()}`;
 
-  const { data, error } = await supabase.rpc('enqueue_aidtrace_message', {
-    p_inbound_message_id: inboundMessageId,
-    p_channel:            `invent_${channel}`,
-    p_source:             phone || contactId,
-    p_payload:            JSON.stringify({ batchId, eventType, details, referenceURI }),
+  const resp = await fetch(`${supabaseUrl}/rest/v1/rpc/enqueue_aidtrace_message`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': supabaseKey,
+      'Authorization': `Bearer ${supabaseKey}`,
+    },
+    body: JSON.stringify({
+      p_inbound_message_id: inboundMessageId,
+      p_channel:            `invent_${channel}`,
+      p_source:             phone || contactId,
+      p_payload:            JSON.stringify({ batchId, eventType, details, referenceURI }),
+    }),
   });
 
-  if (error) throw new Error(`Supabase enqueue error: ${error.message}`);
-  return data;
-}
-
-/**
- * Write directly to Celo (used when queue is disabled — e.g. during
- * initial setup or smoke testing).
- */
-async function writeDirectToCelo({ batchId, eventType, details, referenceURI }) {
-  const provider = new ethers.JsonRpcProvider('https://forno.celo.org');
-  const wallet   = new ethers.Wallet(process.env.RASTROAYUDA_RELAYER_PRIVATE_KEY, provider);
-  const contract = new ethers.Contract(process.env.AIDTRACE_CONTRACT, LEDGER_ABI, wallet);
-
-  const tx = await contract.recordEvent(batchId, eventType, details, referenceURI);
-  await tx.wait(1);
-  return tx.hash;
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Supabase enqueue failed ${resp.status}: ${errText}`);
+  }
+  return resp.json().catch(() => null);
 }
 
 // ---------------------------------------------------------------------------
-// Main handler (Vercel serverless function)
+// Direct Celo write — viem (same pattern as zavu.mjs)
+// ---------------------------------------------------------------------------
+
+async function writeDirectToCelo({ batchId, eventType, details, referenceURI }) {
+  const privateKey = process.env.RASTROAYUDA_RELAYER_PRIVATE_KEY;
+  const contractAddress = process.env.AIDTRACE_CONTRACT;
+  if (!privateKey || !contractAddress) throw new Error('Relayer env vars not set');
+
+  const account = privateKeyToAccount(
+    privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`
+  );
+
+  const walletClient = createWalletClient({
+    account,
+    chain: celoMainnet,
+    transport: http('https://forno.celo.org'),
+  });
+
+  const publicClient = createPublicClient({
+    chain: celoMainnet,
+    transport: http('https://forno.celo.org'),
+  });
+
+  const data = encodeFunctionData({
+    abi: LEDGER_ABI,
+    functionName: 'recordEvent',
+    args: [batchId, eventType, details, referenceURI],
+  });
+
+  const txHash = await walletClient.sendTransaction({
+    to: contractAddress,
+    data,
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1 });
+  return txHash;
+}
+
+// ---------------------------------------------------------------------------
+// Handler
 // ---------------------------------------------------------------------------
 
 export default async function handler(req, res) {
-
-  // CORS: Invent sends from their servers, no Origin header needed.
-  // Only POST is accepted.
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
   }
 
-  // --- Authentication ---
   if (!authenticate(req)) {
-    console.warn('[invent] Rejected request: invalid token');
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // --- Parse body ---
   const {
     contact_id:   contactId,
     contact_name: contactName,
@@ -162,79 +158,67 @@ export default async function handler(req, res) {
   } = req.body ?? {};
 
   if (!contactId || !message) {
-    return res.status(400).json({ error: 'Missing required fields: contact_id, message' });
+    return res.status(400).json({
+      error: 'Missing required fields: contact_id and message',
+      received: { contactId: !!contactId, message: !!message },
+    });
   }
 
-  if (channel && !ALLOWED_CHANNELS.has(channel)) {
-    return res.status(400).json({ error: `Unsupported channel: ${channel}` });
-  }
+  const channelLabel = (channel || 'whatsapp').toLowerCase();
 
-  const channelLabel = channel || 'whatsapp';
-
-  // --- Parse the natural-language custody command ---
+  // Parse the custody command
   const parsed = parseAidTraceCommand(message);
 
   if (!parsed) {
-    // Message is not a custody command (e.g. a greeting or question).
-    // Return a 200 with a help hint so the Invent assistant can relay it
-    // back to the user.
     return res.status(200).json({
       ok:      false,
       reason:  'not_a_command',
-      message: 'No se reconoció un comando de custodia. ' +
-               'Enviá: CELO1 depositar 50 cajas de ibuprofeno',
+      reply:   'No se reconoció un comando de custodia. Ejemplo: CELO1 entregar 50 cajas de agua',
     });
   }
 
   const { batchId, eventType, details } = parsed;
-  const referenceURI = buildReferenceURI({ contactId, channel: channelLabel, batchId, eventType, details });
+  const referenceURI = `invent:${channelLabel}:${contactId} | ${eventType} ${batchId} | ${details}`;
 
-  // --- Queue or direct write ---
-  const useQueue = process.env.AIDTRACE_QUEUE_ENABLED === 'true' &&
-                   process.env.SUPABASE_URL &&
-                   process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  let responsePayload;
+  const useQueue =
+    process.env.AIDTRACE_QUEUE_ENABLED === 'true' &&
+    process.env.SUPABASE_URL &&
+    process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   try {
     if (useQueue) {
-      const row = await enqueue({ contactId, channel: channelLabel, phone, batchId, eventType, details, referenceURI });
-      console.info(`[invent] Queued ${channelLabel} message from ${contactId}: ${batchId} ${eventType}`);
-      responsePayload = {
+      const row = await enqueueSupabase({ contactId, channel: channelLabel, phone, batchId, eventType, details, referenceURI });
+      console.info(`[invent] Queued ${channelLabel}/${contactId}: ${batchId} ${eventType}`);
+      return res.status(200).json({
         ok:         true,
         queued:     true,
-        queue_id:   row?.id,
         batch_id:   batchId,
         event_type: eventType,
         details,
-        // This is the message the Invent assistant should send back to the user.
-        reply:      `✅ En cola: ${eventType} ${batchId}\nDetalles: ${details}\nRecibido en Celo en ~1 min. ⏳`,
-      };
+        reply:      `En cola: ${eventType} ${batchId}\nDetalles: ${details}\nRecibido en Celo en ~1 min.`,
+      });
     } else {
-      // Direct write (dev / smoke-test mode).
       const txHash = await writeDirectToCelo({ batchId, eventType, details, referenceURI });
       console.info(`[invent] Direct Celo write from ${channelLabel}/${contactId}: ${txHash}`);
-      responsePayload = {
+      return res.status(200).json({
         ok:         true,
         queued:     false,
         tx_hash:    txHash,
         batch_id:   batchId,
         event_type: eventType,
         details,
-        reply:      `✅ Registrado en Celo: ${eventType} ${batchId}\n` +
-                    `Detalles: ${details}\n` +
-                    `Tx: https://celoscan.io/tx/${txHash}\n` +
-                    `Auditoría: abrí el link → Logs → data/referenceURI`,
-      };
+        reply:
+          `Registrado en Celo: ${eventType} ${batchId}\n` +
+          `Detalles: ${details}\n` +
+          `Tx: https://celoscan.io/tx/${txHash}`,
+      });
     }
   } catch (err) {
-    console.error('[invent] Write error:', err.message);
+    console.error('[invent] Error:', err.message);
     return res.status(500).json({
       ok:    false,
       error: 'internal_error',
-      reply: '❌ Error interno al registrar el evento. Intentá de nuevo en 1 minuto.',
+      reply: 'Error al registrar el evento. Intentalo de nuevo en 1 minuto.',
     });
   }
-
-  return res.status(200).json(responsePayload);
 }
