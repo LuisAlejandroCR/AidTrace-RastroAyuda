@@ -25,6 +25,17 @@ create index if not exists aidtrace_center_inventory_center_idx
 create index if not exists aidtrace_center_inventory_batch_idx
   on public.aidtrace_center_inventory (batch_id);
 
+-- RLS: enable so anon/authenticated keys cannot write directly.
+-- Reads are public (data is already on-chain on Celoscan).
+-- Writes go through record_center_delivery (SECURITY DEFINER) which
+-- bypasses RLS — the service role key is never exposed to clients.
+alter table public.aidtrace_center_inventory enable row level security;
+
+create policy "aidtrace_center_inventory_public_read"
+  on public.aidtrace_center_inventory
+  for select
+  using (true);
+
 -- Idempotent upsert: safe to call multiple times for the same delivery.
 create or replace function public.record_center_delivery(
   p_center_code  text,
