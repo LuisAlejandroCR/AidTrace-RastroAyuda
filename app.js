@@ -8,6 +8,7 @@ const TIMELINE_ENDPOINT = `${APP_ORIGIN}/api/timeline`;
 const QUEUE_STATUS_ENDPOINT = `${APP_ORIGIN}/api/queue-status`;
 const RETRY_ENDPOINT = `${APP_ORIGIN}/api/retry-queue`;
 const STORE_KEY = "aidtrace_state_v4";
+const DEVICE_KEY = "aidtrace_device_id";
 const COORDINATOR_TOKEN_KEY = "aidtrace_coordinator_token";
 const ONLINE_RELOAD_KEY = "aidtrace_reloaded_after_online";
 const TIMELINE_FETCH_LIMIT = 100;
@@ -133,6 +134,10 @@ const translations = {
     failedJobsBatch: "Batch",
     failedJobsAttempts: "Attempts",
     failedJobsError: "Last error",
+    filterBatchPlaceholder: "Search batch ID…",
+    filterAllActions: "All actions",
+    filterNoResults: "No matching events",
+    filterSelectHint: "Tap to fill form",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -242,6 +247,10 @@ const translations = {
     failedJobsBatch: "Lote",
     failedJobsAttempts: "Intentos",
     failedJobsError: "Ultimo error",
+    filterBatchPlaceholder: "Buscar lote…",
+    filterAllActions: "Todas las acciones",
+    filterNoResults: "Sin resultados",
+    filterSelectHint: "Toca para completar el formulario",
   },
 };
 
@@ -588,6 +597,15 @@ function captureGps() {
   );
 }
 
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem(DEVICE_KEY);
+  if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    id = crypto.randomUUID();
+    localStorage.setItem(DEVICE_KEY, id);
+  }
+  return id;
+}
+
 function relayPacket() {
   return {
     app: "AidTrace",
@@ -600,6 +618,7 @@ function relayPacket() {
       tokenAddress: USDC_TOKEN_ADDRESS,
       feeCurrencyAddress: USDC_FEE_CURRENCY,
     },
+    deviceId: getOrCreateDeviceId(),
     pending: state.events.filter((event) => event.status === "pending"),
   };
 }
@@ -924,12 +943,22 @@ function renderMap() {
   if (!list) return;
   if (!noGeoEvents.length) { list.innerHTML = ""; return; }
   list.innerHTML = `<p class="map-nocoord-heading">${t("mapEventsWithoutLocation")} (${noGeoEvents.length})</p>`
-    + noGeoEvents.slice(0, 20).map((ev) =>
-      `<div class="map-nocoord-item"><strong>${ev.batchId}</strong> · ${actionLabel(ev.actionType)}`
-      + `<br><small>${ev.locationText || ev.note || "—"}</small>`
-      + (ev.txHash ? ` · <a href="${NETWORK.txExplorer}/${ev.txHash}" target="_blank" rel="noreferrer">Tx</a>` : "")
-      + `</div>`,
-    ).join("");
+    + noGeoEvents.slice(0, 30).map((ev) => {
+      const color = MAP_ACTION_COLORS[ev.actionType] || "#9ab9aa";
+      const txLink = ev.txHash
+        ? `<a href="${NETWORK.txExplorer}/${ev.txHash}" target="_blank" rel="noreferrer">${t("txLink")}</a>`
+        : ev.status === "pending" ? `<span class="status-pending">⏳ ${t("statusPending")}</span>` : "";
+      const ts = eventTimestamp(ev) ? new Date(eventTimestamp(ev)).toLocaleString() : "";
+      return `<article class="timeline-item map-nocoord-card">`
+        + `<div class="tag" style="background:${color}22;border-color:${color}66">`
+        + `<span class="map-nocoord-dot" style="background:${color}"></span>`
+        + `<span>${ev.batchId}</span></div>`
+        + `<div><h3>${actionLabel(ev.actionType)}</h3>`
+        + `<p>${ev.locationText || ev.note || "—"}</p>`
+        + (ts ? `<p class="event-time">${ts}</p>` : "")
+        + (txLink ? `<small>${txLink}</small>` : "")
+        + `</div></article>`;
+    }).join("");
 }
 
 function clampTimelinePage() {
@@ -1102,6 +1131,59 @@ $("eventForm").addEventListener("submit", (event) => {
 });
 
 $("gpsBtn")?.addEventListener("click", captureGps);
+
+// Update screen — batch search filter
+(function initUpdateFilter() {
+  const textInput   = $("updateFilterText");
+  const actionSel   = $("updateFilterAction");
+  const resultsList = $("updateFilterResults");
+  if (!textInput || !actionSel || !resultsList) return;
+
+  function applyFilter() {
+    const query  = textInput.value.trim().toLowerCase();
+    const action = actionSel.value;
+    if (!query && !action) { resultsList.hidden = true; resultsList.innerHTML = ""; return; }
+
+    const matches = state.events.filter((ev) => {
+      const batchMatch  = !query  || String(ev.batchId || "").toLowerCase().includes(query);
+      const actionMatch = !action || ev.actionType === action;
+      return batchMatch && actionMatch;
+    }).slice(0, 8);
+
+    if (!matches.length) {
+      resultsList.innerHTML = `<li class="update-filter-empty">${t("filterNoResults")}</li>`;
+      resultsList.hidden = false;
+      return;
+    }
+    resultsList.innerHTML = matches.map((ev) =>
+      `<li class="update-filter-result" data-batch="${ev.batchId}" data-action="${ev.actionType}">`
+      + `<span class="ufr-batch">${ev.batchId}</span>`
+      + `<span class="ufr-action">${actionLabel(ev.actionType)}</span>`
+      + `<span class="ufr-detail">${ev.locationText || ev.note || "—"}</span>`
+      + `</li>`,
+    ).join("");
+    resultsList.hidden = false;
+  }
+
+  textInput.addEventListener("input", applyFilter);
+  actionSel.addEventListener("change", applyFilter);
+
+  resultsList.addEventListener("click", (e) => {
+    const item = e.target.closest("[data-batch]");
+    if (!item) return;
+    $("eventBatchId").value = item.dataset.batch;
+    if (item.dataset.action) $("actionType").value = item.dataset.action;
+    resultsList.hidden = true;
+    textInput.value = "";
+    $("senderName")?.focus();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!resultsList.contains(e.target) && e.target !== textInput && e.target !== actionSel) {
+      resultsList.hidden = true;
+    }
+  });
+})();
 
 $("languageToggle").addEventListener("click", () => {
   state.language = state.language === "en" ? "es" : "en";

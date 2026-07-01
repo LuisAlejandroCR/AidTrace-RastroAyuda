@@ -38,6 +38,7 @@ create or replace function public.begin_aidtrace_browser_relay_event(
   p_batch_id text,
   p_action_type text,
   p_requester_ip text,
+  p_device_id text default null,
   p_rate_limit integer default 30
 )
 returns table (
@@ -53,7 +54,9 @@ as $$
 declare
   v_existing public.aidtrace_browser_relay_events%rowtype;
   v_window_start timestamptz := date_trunc('minute', now());
-  v_bucket_key text := coalesce(nullif(p_requester_ip, ''), 'unknown') || ':' || p_batch_id || ':' || v_window_start::text;
+  -- Prefer stable device ID over IP (mobile IPs change; devices behind CG-NAT share IPs)
+  v_rate_key text := coalesce(nullif(p_device_id, ''), coalesce(nullif(p_requester_ip, ''), 'unknown'));
+  v_bucket_key text := v_rate_key || ':' || p_batch_id || ':' || v_window_start::text;
   v_count integer;
 begin
   select * into v_existing
@@ -164,7 +167,7 @@ begin
 end;
 $$;
 
-grant execute on function public.begin_aidtrace_browser_relay_event(text, text, text, text, integer) to service_role;
+grant execute on function public.begin_aidtrace_browser_relay_event(text, text, text, text, text, integer) to service_role;
 grant execute on function public.complete_aidtrace_browser_relay_event(text, text) to service_role;
 grant execute on function public.fail_aidtrace_browser_relay_event(text, text) to service_role;
 

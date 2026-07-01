@@ -717,11 +717,92 @@ dd {
   margin: 16px 0 8px;
 }
 
+.map-nocoord-card {
+  margin-bottom: 10px;
+}
+
+.map-nocoord-dot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  margin-bottom: 6px;
+}
+
+/* kept for any legacy references */
 .map-nocoord-item {
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
   font-size: 0.85rem;
   line-height: 1.4;
+}
+
+/* Update screen filter bar */
+.update-filter-bar {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.update-filter-input {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.update-filter-select {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.update-filter-results {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  background: var(--surface, #fff);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.07);
+}
+
+.update-filter-result {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 2px 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--line);
+  transition: background 0.12s;
+}
+
+.update-filter-result:last-child { border-bottom: none; }
+.update-filter-result:hover { background: rgba(63,119,99,0.07); }
+
+.ufr-batch  { font-weight: 800; font-size: 0.88rem; color: var(--sage-dark); }
+.ufr-action { font-size: 0.82rem; color: var(--muted); text-align: right; }
+.ufr-detail { font-size: 0.82rem; color: var(--muted); grid-column: 1 / -1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.update-filter-empty {
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
 }
 
 /* Centers dashboard */

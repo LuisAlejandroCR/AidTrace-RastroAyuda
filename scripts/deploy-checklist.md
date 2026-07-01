@@ -18,7 +18,8 @@ Each section maps to a plan block. Tick items in order — some depend on earlie
 
 Open Supabase → SQL Editor → run each file **in order**:
 
-- [ ] `supabase/aidtrace_relay_guard.sql` — browser relay idempotency + rate-limit tables
+- [ ] `supabase/aidtrace_relay_guard.sql` — browser relay idempotency + rate-limit tables (now includes device ID column)
+- [ ] `supabase/aidtrace_access_control.sql` — sender allowlist + hourly rate buckets
 - [ ] `supabase/aidtrace_queue.sql` — message queue table + RPCs
 - [ ] `supabase/aidtrace_timeline.sql` — timeline cache tables (required by `/api/timeline`)
 - [ ] `supabase/aidtrace_queue_retry.sql` — `retry_aidtrace_message(uuid)` RPC
@@ -30,6 +31,7 @@ Verify:
 select count(*) from aidtrace_message_queue;                        -- table exists
 select count(*) from aidtrace_timeline_events;                      -- table exists
 select count(*) from aidtrace_center_inventory;                     -- table exists
+select count(*) from aidtrace_allowed_senders;                      -- table exists (0 rows)
 select record_center_delivery('CENTRO-TEST','BATCH-1');             -- {"ok":true,...}
 select retry_aidtrace_message('00000000-0000-0000-0000-000000000000'::uuid); -- {"ok":false,...}
 select * from get_center_summary() limit 5;                         -- empty or rows
@@ -94,6 +96,21 @@ Zavu dashboard → Conversations → send any message to your AidTrace bot from 
 
 This is already required by `process-queue.mjs`. It is the same token coordinators enter in the PWA retry panel (Timeline → Relay issues → Coordinator token).
 
+### Anti-abuse (sender allowlist + device rate limiting)
+| Variable | Value |
+|---|---|
+| `AIDTRACE_SENDER_ALLOWLIST_ENABLED` | `true` to enforce the Telegram/WhatsApp allowlist (default `false` — safe to enable once first field workers have registered) |
+| `AIDTRACE_SENDER_RATE_LIMIT_HOUR` | max events per sender per hour, default `20` |
+| `AIDTRACE_REGISTRATION_KEYWORD` | secret word field workers send once to self-register (e.g. generate with `node -e "console.log(require('crypto').randomBytes(12).toString('hex'))"`) — distribute out-of-band |
+
+**Self-registration flow:**
+1. Coordinator distributes `AIDTRACE_REGISTRATION_KEYWORD` securely (WhatsApp, in person, etc.).
+2. Field worker opens Telegram → sends the keyword to the AidTrace bot.
+3. Bot replies "✅ Registrado" — they are added to `aidtrace_allowed_senders`.
+4. All subsequent AidTrace events from that chat ID go through normally.
+
+**To block a user:** `UPDATE aidtrace_allowed_senders SET is_active = false WHERE chat_id = '<id>';`
+
 ---
 
 ## 3. GitHub Actions secrets
@@ -151,9 +168,10 @@ Expected: all scripts exit 0 and print only PASS lines.
 ## 6. End-to-end acceptance tests
 
 ### Telegram
-1. Send to AidTrace bot: `CELO1 depositar 30 kits agua CENTRO-NORTE-1`
-2. Bot replies with tx hash in < 30 sec
-3. `GET /api/center-inventory?center=CENTRO-NORTE-1` returns count ≥ 1
+1. If `AIDTRACE_SENDER_ALLOWLIST_ENABLED=true`: send `<AIDTRACE_REGISTRATION_KEYWORD>` → bot replies "✅ Registrado"
+2. Send a custody event: `AT-CELO-1 DELIVERED 30 kits agua CENTRO-NORTE-1`
+3. Bot replies "Recibido en cola" immediately; after the next GitHub Actions cron (≤5 min) a second reply arrives with the Celoscan tx link
+4. `GET /api/center-inventory?center=CENTRO-NORTE-1` returns count ≥ 1
 
 ### WhatsApp
 See `scripts/invent-e2e-guide.md` — full walkthrough including queue monitoring.

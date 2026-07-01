@@ -1,5 +1,5 @@
 import Zavudev from "@zavudev/sdk";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import {
   createPublicClient,
   createWalletClient,
@@ -49,6 +49,10 @@ const BROWSER_RELAY_RATE_LIMIT = Number(process.env.AIDTRACE_BROWSER_RELAY_RATE_
 const QUEUE_WORKER_ID = process.env.AIDTRACE_QUEUE_WORKER_ID || "aidtrace-vercel-worker";
 const QUEUE_PROCESS_ON_INBOUND = process.env.AIDTRACE_QUEUE_PROCESS_ON_INBOUND !== "false";
 const QUEUE_INBOUND_PROCESS_LIMIT = Math.max(1, Number(process.env.AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT || "2"));
+// Anti-abuse: sender allowlist + per-sender hourly rate limit for Telegram/WhatsApp/SMS
+const SENDER_ALLOWLIST_ENABLED  = process.env.AIDTRACE_SENDER_ALLOWLIST_ENABLED === "true";
+const SENDER_RATE_LIMIT_HOUR    = Math.max(1, Number(process.env.AIDTRACE_SENDER_RATE_LIMIT_HOUR || "20"));
+const REGISTRATION_KEYWORD      = process.env.AIDTRACE_REGISTRATION_KEYWORD || "";
 const CENTER_WEBHOOK_URL    = process.env.AIDTRACE_CENTER_WEBHOOK_URL    || "";
 const CENTER_WEBHOOK_SECRET = process.env.AIDTRACE_CENTER_WEBHOOK_SECRET || "";
 let celoWriteQueue = Promise.resolve();
@@ -112,6 +116,38 @@ function hasValidWebhookToken(req) {
   const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
   const explicit = String(req.headers["x-aidtrace-webhook-token"] || "");
   return bearer === WEBHOOK_TOKEN || explicit === WEBHOOK_TOKEN;
+}
+
+function isSafeEqual(a, b) {
+  if (!a || !b) return false;
+  try {
+    const bufA = Buffer.from(String(a));
+    const bufB = Buffer.from(String(b));
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
+}
+
+async function selfRegisterSender(chatId, channel, displayName) {
+  if (!hasSupabaseQueue()) return { registered: false, already_existed: false };
+  const rows = await supabaseRpc("register_aidtrace_sender", {
+    p_chat_id: String(chatId),
+    p_channel: String(channel || "telegram"),
+    p_display_name: String(displayName || chatId).slice(0, 120),
+  });
+  return Array.isArray(rows) ? rows[0] || {} : rows || {};
+}
+
+async function checkAndAdmitSender(chatId, channel) {
+  if (!hasSupabaseQueue()) return { allowed: true, reason: "no_supabase" };
+  const rows = await supabaseRpc("check_and_admit_aidtrace_sender", {
+    p_chat_id: String(chatId),
+    p_channel: String(channel || "telegram"),
+    p_rate_limit_hour: SENDER_RATE_LIMIT_HOUR,
+  });
+  return Array.isArray(rows) ? rows[0] || { allowed: false, reason: "no_result" } : rows;
 }
 
 function validateTextField(value, label, maxLength) {
@@ -211,12 +247,13 @@ function hasBrowserRelayGuard() {
   return Boolean(BROWSER_RELAY_GUARD_ENABLED && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 }
 
-async function beginBrowserRelayEvent(item, requesterIp) {
+async function beginBrowserRelayEvent(item, requesterIp, deviceId) {
   const rows = await supabaseRpc("begin_aidtrace_browser_relay_event", {
     p_event_id: item.id,
     p_batch_id: String(item.batchId || "").toUpperCase(),
     p_action_type: String(item.actionType || "").toUpperCase(),
     p_requester_ip: requesterIp,
+    p_device_id: deviceId || null,
     p_rate_limit: BROWSER_RELAY_RATE_LIMIT,
   });
 
@@ -514,6 +551,7 @@ async function handleBrowserRelay(packet, req, res) {
   const failed = [];
   const queued = [];
   const requesterIp = requestIp(req);
+  const deviceId = typeof packet.deviceId === "string" ? packet.deviceId.slice(0, 64) : null;
   const relayGuardEnabled = hasBrowserRelayGuard();
 
   for (const item of pending) {
@@ -521,7 +559,7 @@ async function handleBrowserRelay(packet, req, res) {
     try {
       const parsed = relayEventToParsed(item);
       if (relayGuardEnabled) {
-        const guard = await beginBrowserRelayEvent(item, requesterIp);
+        const guard = await beginBrowserRelayEvent(item, requesterIp, deviceId);
         if (guard?.duplicate) {
           if (guard.tx_hash) {
             recorded.push({
@@ -891,6 +929,45 @@ export default async function handler(req, res) {
     let idempotencyKey;
     let queuedMessageId = "";
 
+    // ── Registration check ────────────────────────────────────────────────────
+    // A sender registers once by sending the AIDTRACE_REGISTRATION_KEYWORD.
+    // Token comparison is done here (timing-safe); SQL just does the upsert.
+    const trimmedText = (data.text || "").trim();
+    if (REGISTRATION_KEYWORD && isSafeEqual(trimmedText.toLowerCase(), REGISTRATION_KEYWORD.toLowerCase())) {
+      try {
+        const regResult = await selfRegisterSender(to, channel, String(data.from || data.contactId || to));
+        replyText = regResult.already_existed
+          ? "✅ Ya estabas registrado. Puedes enviar eventos AidTrace normalmente."
+          : "✅ Registrado en AidTrace. Ya puedes registrar movimientos de insumos.";
+      } catch (err) {
+        console.warn("[access] registration error:", err.message);
+        replyText = "Error al registrarse. Intenta de nuevo.";
+      }
+      idempotencyKey = `aidtrace-reg-${getMessageId(event, data)}`;
+      await zavu.messages.send({ to, channel, text: replyText, idempotencyKey });
+      return res.status(200).json({ ok: true, registered: true });
+    }
+
+    // ── Sender admission check ─────────────────────────────────────────────────
+    if (SENDER_ALLOWLIST_ENABLED) {
+      let admission;
+      try {
+        admission = await checkAndAdmitSender(to, channel);
+      } catch (err) {
+        console.warn("[access] admission check failed (fail-open):", err.message);
+        admission = { allowed: true };
+      }
+      if (!admission?.allowed) {
+        replyText = admission?.reason === "rate_limited"
+          ? "⚠️ Limite de eventos alcanzado. Intenta de nuevo en una hora."
+          : "Para usar AidTrace envia la palabra de acceso que te dio tu coordinador.";
+        idempotencyKey = `aidtrace-denied-${getMessageId(event, data)}`;
+        await zavu.messages.send({ to, channel, text: replyText, idempotencyKey });
+        return res.status(200).json({ ok: true, denied: true });
+      }
+    }
+
+    // ── Normal AidTrace processing ─────────────────────────────────────────────
     try {
       parsed = parseAidTraceText(data.text);
       const messageId = getMessageId(event, data);
