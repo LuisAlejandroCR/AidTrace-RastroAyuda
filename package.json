@@ -1,7 +1,7 @@
 {
   "scripts": {
     "test": "node --test",
-    "check": "node --check api/zavu.mjs && node --check api/process-queue.mjs && node --check api/header-probe.mjs && node --check api/timeline.mjs && node --check app.js"
+    "check": "node --check api/zavu.mjs && node --check api/process-queue.mjs && node --check api/header-probe.mjs && node --check api/timeline.mjs && node --check api/zavu-proxy.mjs && node --check api/invent.mjs && node --check api/center-inventory.mjs && node --check api/center-webhook.mjs && node --check api/export.mjs && node --check api/queue-status.mjs && node --check api/retry-queue.mjs && node --check lib/aidtrace-parser.mjs && node --check lib/timeline-parser.mjs && node --check lib/invent-notify.mjs && node --check app.js"
   },
   "dependencies": {
     "@zavudev/sdk": "^0.46.0",

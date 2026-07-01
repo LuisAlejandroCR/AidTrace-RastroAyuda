@@ -20,6 +20,7 @@ Open Supabase → SQL Editor → run each file **in order**:
 
 - [ ] `supabase/aidtrace_relay_guard.sql` — browser relay idempotency + rate-limit tables
 - [ ] `supabase/aidtrace_queue.sql` — message queue table + RPCs
+- [ ] `supabase/aidtrace_timeline.sql` — timeline cache tables (required by `/api/timeline`)
 - [ ] `supabase/aidtrace_queue_retry.sql` — `retry_aidtrace_message(uuid)` RPC
 - [ ] `supabase/center_inventory.sql` — center inventory table + `record_center_delivery` RPC
 - [ ] `supabase/center_summary.sql` — `get_center_summary()` aggregate RPC
@@ -27,6 +28,7 @@ Open Supabase → SQL Editor → run each file **in order**:
 Verify:
 ```sql
 select count(*) from aidtrace_message_queue;                        -- table exists
+select count(*) from aidtrace_timeline_events;                      -- table exists
 select count(*) from aidtrace_center_inventory;                     -- table exists
 select record_center_delivery('CENTRO-TEST','BATCH-1');             -- {"ok":true,...}
 select retry_aidtrace_message('00000000-0000-0000-0000-000000000000'::uuid); -- {"ok":false,...}
@@ -136,6 +138,10 @@ vercel --prod
 .\scripts\center-webhook-smoke-check.ps1 `
   -BaseUrl "https://aidtrace-rastroayuda.vercel.app" `
   -Secret  $env:AIDTRACE_CENTER_WEBHOOK_SECRET
+
+.\scripts\iteration2-smoke-check.ps1 `
+  -BaseUrl "https://aidtrace-rastroayuda.vercel.app" `
+  -Token   $env:AIDTRACE_QUEUE_WORKER_TOKEN
 ```
 
 Expected: all scripts exit 0 and print only PASS lines.
