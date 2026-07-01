@@ -180,6 +180,7 @@ h2 {
 }
 
 .tab {
+  position: relative;
   min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -192,6 +193,27 @@ h2 {
   background: var(--sage-dark);
   border-color: var(--sage-dark);
   color: #fff;
+}
+
+.tab-badge {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  background: var(--gold);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 850;
+  padding: 0 5px;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.tab-badge:empty {
+  display: none;
 }
 
 .screen-shell {

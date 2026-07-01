@@ -1,0 +1,155 @@
+# AidTrace Deployment Checklist
+
+Complete this checklist top-to-bottom before calling a deployment production-ready.
+Each section maps to a plan block. Tick items in order — some depend on earlier ones.
+
+---
+
+## 0. Prerequisites
+
+- [ ] `npm run test` — all tests green locally
+- [ ] `npm run check` — no syntax errors
+- [ ] Vercel project linked (`vercel link`)
+- [ ] Supabase project exists and `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` are set in Vercel
+
+---
+
+## 1. Supabase schema (run once)
+
+Open Supabase → SQL Editor → run each file in order:
+
+- [ ] `supabase/aidtrace_message_queue.sql` — queue table + RLS + helper RPCs
+- [ ] `supabase/center_inventory.sql` — center inventory table + `record_center_delivery` RPC
+
+Verify:
+```sql
+select count(*) from aidtrace_message_queue;       -- table exists
+select count(*) from aidtrace_center_inventory;    -- table exists
+select record_center_delivery('CENTRO-TEST','BATCH-1'); -- returns {"ok":true,...}
+```
+
+---
+
+## 2. Vercel environment variables
+
+Set all of these in Vercel → Settings → Environment Variables.
+Prefix `NEXT_PUBLIC_` only where shown — everything else is server-only.
+
+### Contract / RPC (Block A)
+| Variable | Value |
+|---|---|
+| `CONTRACT_ADDRESS` | `0xaf5c40e82ac9255479a1f447e81992b71c4f4934` |
+| `RELAYER_PRIVATE_KEY` | your funded Celo wallet private key |
+| `CELO_RPC_URL` | `https://forno.celo.org` |
+| `CELOSCAN_TX_BASE` | `https://celoscan.io/tx` |
+
+### Browser relay auth (Block A)
+| Variable | Value |
+|---|---|
+| `AIDTRACE_BROWSER_RELAY_TOKEN` | any random string — set same in `app.js` RELAY_TOKEN |
+| `AIDTRACE_ALLOWED_ORIGINS` | `https://aidtrace-rastroayuda.vercel.app` (comma-separated for extra domains) |
+
+### Supabase (Blocks A + F)
+| Variable | Value |
+|---|---|
+| `SUPABASE_URL` | your Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | service role key (server-only — never `NEXT_PUBLIC_`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | same URL — used by the PWA for public reads |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon key |
+
+### Zavu / Telegram (Block E — Telegram channel)
+| Variable | Value |
+|---|---|
+| `RASTROAYUDA_ZAVU_API_KEY` | Zavu API key (Zavu dashboard → Settings → API Keys) |
+| `AIDTRACE_ZAVU_WEBHOOK_SECRET` | Zavu webhook secret (Zavu → Webhook → Secret) |
+| `AIDTRACE_INVENT_FALLBACK_ZAVU_CHAT` | Zavu chat ID for fallback Telegram alerts |
+
+**How to get `AIDTRACE_INVENT_FALLBACK_ZAVU_CHAT`:**
+Zavu dashboard → Conversations → send any message to your AidTrace bot from the alert account → copy the chat ID from the conversation URL.
+
+### Invent / WhatsApp + SMS (Block E — WhatsApp/SMS channel)
+| Variable | Value |
+|---|---|
+| `AIDTRACE_INVENT_WEBHOOK_TOKEN` | random token — set same in Invent HTTP action header |
+| `AIDTRACE_INVENT_API_KEY` | Invent API key (Invent → Settings → API Keys) |
+
+### Center inventory webhook (Block F)
+| Variable | Value |
+|---|---|
+| `AIDTRACE_CENTER_WEBHOOK_URL` | `https://aidtrace-rastroayuda.vercel.app/api/center-webhook` |
+| `AIDTRACE_CENTER_WEBHOOK_SECRET` | random hex: `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"` |
+| `AIDTRACE_CENTER_NOTIFY_CHAT` | Zavu chat ID to notify on center deliveries (same steps as FALLBACK_ZAVU_CHAT above) |
+
+---
+
+## 3. GitHub Actions secrets
+
+In the GitHub repo → Settings → Secrets and variables → Actions:
+
+- [ ] `RELAYER_PRIVATE_KEY` — same as Vercel
+- [ ] `SUPABASE_URL` — same as Vercel
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` — same as Vercel
+- [ ] `AIDTRACE_INVENT_API_KEY` — same as Vercel
+- [ ] `RASTROAYUDA_ZAVU_API_KEY` — same as Vercel
+
+These are used by `.github/workflows/process-queue.yml` (runs every 5 min).
+
+---
+
+## 4. Invent (WhatsApp/SMS) setup
+
+Follow `scripts/invent-setup.md` fully. Key steps:
+
+- [ ] Claim a WhatsApp Business number in Invent
+- [ ] Create HTTP action pointing to `https://aidtrace-rastroayuda.vercel.app/api/invent`
+- [ ] Set header `X-AidTrace-Invent-Token: <AIDTRACE_INVENT_WEBHOOK_TOKEN>`
+- [ ] Test inbound → see `scripts/invent-e2e-guide.md`
+
+---
+
+## 5. Deploy and smoke-test
+
+```powershell
+# Deploy
+vercel --prod
+
+# Run all smoke tests (replace values with your own)
+.\scripts\final-demo-check.ps1 -BaseUrl "https://aidtrace-rastroayuda.vercel.app"
+
+.\scripts\invent-smoke-check.ps1 `
+  -BaseUrl "https://aidtrace-rastroayuda.vercel.app" `
+  -Token   $env:AIDTRACE_INVENT_WEBHOOK_TOKEN
+
+.\scripts\center-webhook-smoke-check.ps1 `
+  -BaseUrl "https://aidtrace-rastroayuda.vercel.app" `
+  -Secret  $env:AIDTRACE_CENTER_WEBHOOK_SECRET
+```
+
+Expected: all scripts exit 0 and print only PASS lines.
+
+---
+
+## 6. End-to-end acceptance tests
+
+### Telegram
+1. Send to AidTrace bot: `CELO1 depositar 30 kits agua CENTRO-NORTE-1`
+2. Bot replies with tx hash in < 30 sec
+3. `GET /api/center-inventory?center=CENTRO-NORTE-1` returns count ≥ 1
+
+### WhatsApp
+See `scripts/invent-e2e-guide.md` — full walkthrough including queue monitoring.
+
+### Map view (PWA)
+1. Open the PWA → tap "Map" tab
+2. Tap "📍 GPS" in the event form → coordinates appear
+3. Submit a custody event
+4. Return to Map → marker appears at GPS location
+
+---
+
+## 7. Post-deploy monitoring
+
+- Vercel Functions log: `vercel logs --prod` — watch for `[center-webhook]` and `[invent]` lines
+- Supabase: `select * from aidtrace_message_queue order by created_at desc limit 10` — rows should move from `pending` → `completed`
+- GitHub Actions: `.github/workflows/process-queue.yml` — runs every 5 min — check last run status
+- Celoscan: `https://celoscan.io/address/0xaf5c40e82ac9255479a1f447e81992b71c4f4934` — new events should appear

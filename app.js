@@ -803,6 +803,8 @@ function render() {
   const pendingCount = state.events.filter((event) => event.status === "pending").length;
   $("networkState").textContent = navigator.onLine ? t("networkReady") : t("offlineReady");
   $("queueState").textContent = `${pendingCount} ${t("pendingProofs")} - ${NETWORK.name}`;
+  const badge = $("pendingBadge");
+  if (badge) badge.textContent = pendingCount > 0 ? String(pendingCount) : "";
 
   const timeline = $("timeline");
   const timelineControls = document.querySelectorAll("[data-timeline-controls]");
