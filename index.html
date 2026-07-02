@@ -90,18 +90,6 @@
           <h2 id="update-title" data-i18n="updateTitle">Record handoff event</h2>
           <p data-i18n="updateIntro">Scan the QR, type the printed code, or use the Telegram bot to record what happened.</p>
         </div>
-        <div class="update-filter-bar panel">
-          <input id="updateFilterText" type="search" class="update-filter-input" data-i18n-placeholder="filterBatchPlaceholder" placeholder="Search batch ID…" autocomplete="off" />
-          <select id="updateFilterAction" class="update-filter-select">
-            <option value="" data-i18n="filterAllActions">All actions</option>
-            <option value="PICKED_UP" data-i18n="actionPickedUp">Picked up</option>
-            <option value="ARRIVED" data-i18n="actionArrived">Arrived</option>
-            <option value="DELIVERED" data-i18n="actionDelivered">Delivered</option>
-            <option value="DAMAGED" data-i18n="actionDamaged">Damaged</option>
-            <option value="NEEDS_REVIEW" data-i18n="actionNeedsReview">Needs review</option>
-            <option value="SMS_CONFIRMED" data-i18n="actionSmsConfirmed">Verified</option>
-          </select>
-        </div>
         <ul id="updateFilterResults" class="update-filter-results" hidden></ul>
         <form id="eventForm" class="panel form-grid">
           <label>
