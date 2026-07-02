@@ -172,7 +172,7 @@ h2 {
   top: 0;
   z-index: 5;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   padding: 10px clamp(12px, 4vw, 34px);
   background: rgba(238, 246, 241, 0.86);
@@ -662,6 +662,11 @@ dd {
     width: 64px;
     height: 64px;
   }
+
+  .tvt-btn {
+    padding: 6px 9px;
+    font-size: 0.78rem;
+  }
 }
 
 @media (max-width: 430px) {
@@ -740,25 +745,36 @@ dd {
 /* Timeline toolbar: filter + view toggle */
 .timeline-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  padding: 10px 14px;
+  padding: 10px 12px;
   margin-bottom: 10px;
+}
+
+.timeline-toolbar .update-filter-input {
+  flex: 1 1 140px;
+  min-width: 80px;
+}
+
+.timeline-toolbar .update-filter-select {
+  flex: 1 1 120px;
+  min-width: 100px;
 }
 
 .view-toggle {
   display: flex;
   gap: 3px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 
 .tvt-btn {
-  padding: 7px 12px;
+  padding: 6px 11px;
   font-size: 0.82rem;
   font-weight: 600;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.68);
   color: var(--muted);
   cursor: pointer;
   white-space: nowrap;
@@ -828,31 +844,33 @@ dd {
 /* Update screen filter bar */
 .update-filter-bar {
   display: flex;
-  gap: 10px;
-  padding: 10px 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
   margin-bottom: 0;
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
 
 .update-filter-input {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 120px;
+  min-width: 80px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 8px 12px;
+  padding: 7px 12px;
   font-size: 0.9rem;
-  background: var(--surface);
+  background: var(--paper);
   color: var(--ink);
 }
 
 .update-filter-select {
-  flex: 0 0 auto;
+  flex: 1 1 120px;
+  min-width: 100px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   font-size: 0.9rem;
-  background: var(--surface);
+  background: var(--paper);
   color: var(--ink);
 }
 
@@ -1036,6 +1054,22 @@ dd {
   border-top: 1px solid var(--line);
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+/* ── Responsive filter bars (must come after toolbar base rules) ── */
+@media (max-width: 760px) {
+  /* Search input takes full first row; select + toggle share second row */
+  .timeline-toolbar .update-filter-input,
+  .update-filter-bar .update-filter-input {
+    flex: 1 1 100%;
+    order: -1;
+  }
+
+  .timeline-toolbar .update-filter-select,
+  .update-filter-bar .update-filter-select {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .failed-jobs-token summary {
