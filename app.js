@@ -882,8 +882,10 @@ function renderNoCoordSummary(filteredEvents) {
   const noGeo = filteredEvents.filter((e) => e.lat == null || e.lon == null);
   if (!noGeo.length) { summary.innerHTML = ""; return; }
 
+  const CANON = { PICKUP: "PICKED_UP", DELIVER: "DELIVERED", REVIEW: "NEEDS_REVIEW" };
+  const toCanon = (t) => { const u = String(t || "").toUpperCase(); return CANON[u] || u; };
   const counts = {};
-  for (const ev of noGeo) counts[ev.actionType] = (counts[ev.actionType] || 0) + 1;
+  for (const ev of noGeo) { const k = toCanon(ev.actionType); counts[k] = (counts[k] || 0) + 1; }
 
   const chips = Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
