@@ -195,10 +195,22 @@
     </template>
 
     <!-- Demo tour overlay -->
-    <div id="demoOverlay" class="demo-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="demoTitle">
-      <div class="demo-card">
-        <button id="demoClose" class="demo-close" type="button" aria-label="Close tour">✕</button>
-        <span class="demo-icon" id="demoIcon">📦</span>
+    <div id="demoOverlay" class="demo-overlay is-hidden" role="dialog" aria-modal="true">
+      <!-- Step 0: language picker -->
+      <div class="demo-card" id="demoLangCard">
+        <button id="demoCloseLang" class="demo-close" type="button" aria-label="Close">✕</button>
+        <span class="demo-icon">🌐</span>
+        <h3 class="demo-title">Idioma · Language</h3>
+        <p class="demo-body demo-body--bilingual">¿En qué idioma quieres continuar?<br>Which language do you prefer?</p>
+        <div class="demo-lang-btns">
+          <button id="demoLangEs" class="demo-lang-btn" type="button">Español</button>
+          <button id="demoLangEn" class="demo-lang-btn" type="button">English</button>
+        </div>
+      </div>
+      <!-- Steps 1–3: feature tour -->
+      <div class="demo-card" id="demoTourCard" hidden>
+        <button id="demoClose" class="demo-close" type="button" aria-label="Close">✕</button>
+        <span class="demo-icon" id="demoIcon"></span>
         <span class="demo-tab-pill" id="demoTabPill"></span>
         <h3 class="demo-title" id="demoTitle"></h3>
         <p class="demo-body" id="demoBody"></p>
@@ -216,6 +228,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="./qrcode.js"></script>
-    <script src="./app.js"></script>
+    <script src="./app.js?v=2"></script>
   </body>
 </html>

@@ -1315,32 +1315,16 @@ loadOnchainTimeline({ silent: true });
   const overlay = document.getElementById("demoOverlay");
   if (!overlay) return;
 
+  const langCard = document.getElementById("demoLangCard");
+  const tourCard = document.getElementById("demoTourCard");
+  const tabbar   = document.querySelector(".tabbar");
+  let step = 0;
+
   const STEPS = () => [
     { icon: "📦", tab: "create",   title: t("demoStep1Title"), body: t("demoStep1Body") },
     { icon: "📝", tab: "update",   title: t("demoStep2Title"), body: t("demoStep2Body") },
     { icon: "📋", tab: "timeline", title: t("demoStep3Title"), body: t("demoStep3Body") },
   ];
-
-  let step = 0;
-  const tabbar = document.querySelector(".tabbar");
-
-  function renderStep() {
-    const steps = STEPS();
-    const s = steps[step];
-    overlay.querySelector("#demoIcon").textContent = s.icon;
-    overlay.querySelector("#demoTitle").textContent = s.title;
-    overlay.querySelector("#demoBody").textContent = s.body;
-    overlay.querySelectorAll(".demo-dot").forEach((d, i) => d.classList.toggle("is-active", i === step));
-    const nextBtn = overlay.querySelector("#demoNext");
-    nextBtn.textContent = step === steps.length - 1 ? t("demoStart") : t("demoNext");
-    // Mirror the tab label in the pill inside the card
-    const tabBtn = document.querySelector(`.tab[data-screen-target="${s.tab}"]`);
-    const pill = overlay.querySelector("#demoTabPill");
-    if (pill && tabBtn) pill.textContent = tabBtn.textContent.trim().replace(/\s*\d+$/, "");
-    // Raise and highlight the relevant tab above the blur
-    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("demo-highlight"));
-    tabBtn?.classList.add("demo-highlight");
-  }
 
   function closeTour() {
     overlay.classList.add("is-hidden");
@@ -1349,17 +1333,48 @@ loadOnchainTimeline({ silent: true });
     localStorage.setItem(DEMO_KEY, "1");
   }
 
-  overlay.querySelector("#demoClose")?.addEventListener("click", closeTour);
-  overlay.querySelector("#demoSkip")?.addEventListener("click", closeTour);
-  overlay.querySelector("#demoNext")?.addEventListener("click", () => {
+  function renderStep() {
+    const steps = STEPS();
+    const s = steps[step];
+    document.getElementById("demoIcon").textContent = s.icon;
+    document.getElementById("demoTitle").textContent = s.title;
+    document.getElementById("demoBody").textContent = s.body;
+    tourCard.querySelectorAll(".demo-dot").forEach((d, i) => d.classList.toggle("is-active", i === step));
+    const nextBtn = document.getElementById("demoNext");
+    nextBtn.textContent = step === steps.length - 1 ? t("demoStart") : t("demoNext");
+    const tabBtn = document.querySelector(`.tab[data-screen-target="${s.tab}"]`);
+    const pill = document.getElementById("demoTabPill");
+    if (pill && tabBtn) pill.textContent = tabBtn.textContent.trim().replace(/\s*\d+$/, "");
+    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("demo-highlight"));
+    tabBtn?.classList.add("demo-highlight");
+  }
+
+  function startTour(lang) {
+    state.language = lang;
+    saveState();
+    render();
+    langCard.hidden = true;
+    tourCard.hidden = false;
+    tabbar?.classList.add("demo-active");
+    const skipBtn = document.getElementById("demoSkip");
+    if (skipBtn) skipBtn.textContent = t("demoSkip");
+    step = 0;
+    renderStep();
+  }
+
+  // Language card
+  document.getElementById("demoCloseLang")?.addEventListener("click", closeTour);
+  document.getElementById("demoLangEs")?.addEventListener("click", () => startTour("es"));
+  document.getElementById("demoLangEn")?.addEventListener("click", () => startTour("en"));
+
+  // Tour card
+  document.getElementById("demoClose")?.addEventListener("click", closeTour);
+  document.getElementById("demoSkip")?.addEventListener("click", closeTour);
+  document.getElementById("demoNext")?.addEventListener("click", () => {
     const steps = STEPS();
     if (step < steps.length - 1) { step++; renderStep(); }
     else closeTour();
   });
 
   overlay.classList.remove("is-hidden");
-  tabbar?.classList.add("demo-active");
-  const skipBtn = overlay.querySelector("#demoSkip");
-  if (skipBtn) skipBtn.textContent = t("demoSkip");
-  renderStep();
 })();

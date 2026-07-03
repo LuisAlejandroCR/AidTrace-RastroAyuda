@@ -1180,6 +1180,65 @@ dd {
 
 .demo-skip:hover { color: var(--ink); }
 
+/* Language picker */
+.demo-body--bilingual {
+  line-height: 1.7;
+}
+
+.demo-lang-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.demo-lang-btn {
+  flex: 1;
+  padding: 14px 8px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.14s;
+}
+
+.demo-lang-btn:hover {
+  background: var(--sage-dark);
+  border-color: var(--sage-dark);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+/* Mobile: compact card, no scale overflow */
+@media (max-width: 540px) {
+  .demo-overlay {
+    padding: 16px;
+    align-items: center;
+  }
+
+  .demo-card {
+    padding: 22px 18px 16px;
+    width: 100%;
+  }
+
+  .demo-tab-pill {
+    transform: none;
+    font-size: 0.78rem;
+    padding: 3px 12px;
+  }
+
+  .demo-lang-btn {
+    padding: 12px 6px;
+    font-size: 0.92rem;
+  }
+
+  .demo-footer {
+    margin-top: 16px;
+  }
+}
+
 /* Tabbar floats above overlay; highlighted tab zooms */
 .tabbar.demo-active { z-index: 201; }
 
