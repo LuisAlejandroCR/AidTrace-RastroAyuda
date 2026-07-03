@@ -141,6 +141,15 @@ const translations = {
     filterAllActions: "All actions",
     filterNoResults: "No matching events",
     filterSelectHint: "Tap to fill form",
+    demoStep1Title: "Create a batch",
+    demoStep1Body: "Fill in supply details and print the QR label. Scan it on arrival to open this batch instantly.",
+    demoStep2Title: "Record events",
+    demoStep2Body: "Scan the QR or type the code to log pickups, deliveries, damage — works offline too.",
+    demoStep3Title: "Verify on Timeline",
+    demoStep3Body: "Every event appears here with tamper-proof blockchain proof. Switch to Map to see GPS locations.",
+    demoNext: "Next →",
+    demoStart: "Get started",
+    demoSkip: "Skip",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -257,6 +266,15 @@ const translations = {
     filterAllActions: "Todas las acciones",
     filterNoResults: "Sin resultados",
     filterSelectHint: "Toca para completar el formulario",
+    demoStep1Title: "Crea un lote",
+    demoStep1Body: "Completa los datos y obtén la etiqueta QR. Escanéala al recibirlo para abrir el lote al instante.",
+    demoStep2Title: "Registra eventos",
+    demoStep2Body: "Escanea el QR o escribe el código para registrar: recogida, entrega, daños — funciona sin conexión.",
+    demoStep3Title: "Verifica en Historial",
+    demoStep3Body: "Cada evento aparece aquí con prueba en blockchain. Cambia a Mapa para ver las ubicaciones GPS.",
+    demoNext: "Siguiente →",
+    demoStart: "Comenzar",
+    demoSkip: "Omitir",
   },
 };
 
@@ -1290,3 +1308,58 @@ if ("serviceWorker" in navigator) {
 render();
 hydrateBatchFromUrl();
 loadOnchainTimeline({ silent: true });
+
+(function initDemoTour() {
+  const DEMO_KEY = "aidtrace_demo_seen";
+  if (localStorage.getItem(DEMO_KEY)) return;
+  const overlay = document.getElementById("demoOverlay");
+  if (!overlay) return;
+
+  const STEPS = () => [
+    { icon: "📦", tab: "create",   title: t("demoStep1Title"), body: t("demoStep1Body") },
+    { icon: "📝", tab: "update",   title: t("demoStep2Title"), body: t("demoStep2Body") },
+    { icon: "📋", tab: "timeline", title: t("demoStep3Title"), body: t("demoStep3Body") },
+  ];
+
+  let step = 0;
+  const tabbar = document.querySelector(".tabbar");
+
+  function renderStep() {
+    const steps = STEPS();
+    const s = steps[step];
+    overlay.querySelector("#demoIcon").textContent = s.icon;
+    overlay.querySelector("#demoTitle").textContent = s.title;
+    overlay.querySelector("#demoBody").textContent = s.body;
+    overlay.querySelectorAll(".demo-dot").forEach((d, i) => d.classList.toggle("is-active", i === step));
+    const nextBtn = overlay.querySelector("#demoNext");
+    nextBtn.textContent = step === steps.length - 1 ? t("demoStart") : t("demoNext");
+    // Mirror the tab label in the pill inside the card
+    const tabBtn = document.querySelector(`.tab[data-screen-target="${s.tab}"]`);
+    const pill = overlay.querySelector("#demoTabPill");
+    if (pill && tabBtn) pill.textContent = tabBtn.textContent.trim().replace(/\s*\d+$/, "");
+    // Raise and highlight the relevant tab above the blur
+    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("demo-highlight"));
+    tabBtn?.classList.add("demo-highlight");
+  }
+
+  function closeTour() {
+    overlay.classList.add("is-hidden");
+    document.querySelectorAll(".tab").forEach((b) => b.classList.remove("demo-highlight"));
+    tabbar?.classList.remove("demo-active");
+    localStorage.setItem(DEMO_KEY, "1");
+  }
+
+  overlay.querySelector("#demoClose")?.addEventListener("click", closeTour);
+  overlay.querySelector("#demoSkip")?.addEventListener("click", closeTour);
+  overlay.querySelector("#demoNext")?.addEventListener("click", () => {
+    const steps = STEPS();
+    if (step < steps.length - 1) { step++; renderStep(); }
+    else closeTour();
+  });
+
+  overlay.classList.remove("is-hidden");
+  tabbar?.classList.add("demo-active");
+  const skipBtn = overlay.querySelector("#demoSkip");
+  if (skipBtn) skipBtn.textContent = t("demoSkip");
+  renderStep();
+})();

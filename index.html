@@ -194,6 +194,26 @@
       </article>
     </template>
 
+    <!-- Demo tour overlay -->
+    <div id="demoOverlay" class="demo-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="demoTitle">
+      <div class="demo-card">
+        <button id="demoClose" class="demo-close" type="button" aria-label="Close tour">✕</button>
+        <span class="demo-icon" id="demoIcon">📦</span>
+        <span class="demo-tab-pill" id="demoTabPill"></span>
+        <h3 class="demo-title" id="demoTitle"></h3>
+        <p class="demo-body" id="demoBody"></p>
+        <div class="demo-footer">
+          <button id="demoSkip" class="demo-skip" type="button"></button>
+          <div class="demo-dots" aria-hidden="true">
+            <span class="demo-dot"></span>
+            <span class="demo-dot"></span>
+            <span class="demo-dot"></span>
+          </div>
+          <button id="demoNext" class="primary compact" type="button"></button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="./qrcode.js"></script>
     <script src="./app.js"></script>
