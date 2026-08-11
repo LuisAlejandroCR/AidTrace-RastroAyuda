@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { verifyTurnstileToken } from "../lib/turnstile.mjs";
 
-function mockFetch(payload, status = 200) {
+const PROD_HOSTNAMES = new Set(["aidtrace-rastroayuda.vercel.app"]);
+
+function mockFetch(payload, status = 200, expectedSecret = "abc123") {
   const originalFetch = global.fetch;
   global.fetch = async (url, options) => {
     assert.match(url, /challenges\.cloudflare\.com\/turnstile\/v0\/siteverify/);
-    assert.match(String(options?.body || ""), /secret=abc123/);
+    assert.match(String(options?.body || ""), new RegExp(`secret=${expectedSecret}`));
+    assert.ok(options?.signal instanceof AbortSignal, "request must carry a timeout signal");
     return {
       ok: status >= 200 && status < 300,
       status,
@@ -30,14 +33,63 @@ test("returns missing_secret when secret is not configured", async () => {
   assert.equal(result.error, "missing_secret");
 });
 
-test("passes when Cloudflare confirms the token", async () => {
-  const restore = mockFetch({ success: true });
+test("passes when Cloudflare confirms the token with matching action and hostname", async () => {
+  const restore = mockFetch({
+    success: true,
+    action: "relay",
+    hostname: "aidtrace-rastroayuda.vercel.app",
+  });
   try {
     const result = await verifyTurnstileToken({
       secret: "abc123",
       token: "valid-token",
       remoteIp: "1.2.3.4",
+      expectedHostnames: PROD_HOSTNAMES,
     });
+    assert.equal(result.ok, true);
+  } finally {
+    restore();
+  }
+});
+
+test("rejects when the widget action does not match the expected action", async () => {
+  const restore = mockFetch({ success: true, action: "signup", hostname: "aidtrace-rastroayuda.vercel.app" });
+  try {
+    const result = await verifyTurnstileToken({
+      secret: "abc123",
+      token: "valid-token",
+      expectedHostnames: PROD_HOSTNAMES,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "action_mismatch");
+  } finally {
+    restore();
+  }
+});
+
+test("rejects when the visitor hostname is not in the allowlist", async () => {
+  const restore = mockFetch({
+    success: true,
+    action: "relay",
+    hostname: "evil.example.com",
+  });
+  try {
+    const result = await verifyTurnstileToken({
+      secret: "abc123",
+      token: "valid-token",
+      expectedHostnames: PROD_HOSTNAMES,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "hostname_mismatch");
+  } finally {
+    restore();
+  }
+});
+
+test("skips hostname check when no allowlist is configured (empty allowedHostnames)", async () => {
+  const restore = mockFetch({ success: true, action: "relay", hostname: "any.domain.example" });
+  try {
+    const result = await verifyTurnstileToken({ secret: "abc123", token: "valid-token" });
     assert.equal(result.ok, true);
   } finally {
     restore();

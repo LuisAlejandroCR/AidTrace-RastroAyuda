@@ -768,7 +768,9 @@ async function postRelayPacket(useBeacon = false) {
     });
   }
   if (!response.ok && response.status !== 207) throw new Error(`Relay failed: ${response.status}`);
-  return response.json();
+  const data = await response.json();
+  consumeTurnstileToken();
+  return data;
 }
 
 async function autoSyncPending() {
@@ -1736,7 +1738,7 @@ const verifyState = {
   authDone: false,
   needsAuth: false,
   needsTurnstile: false,
-  turnstileRendered: false,
+  turnstileWidgetId: null,
 };
 
 function loadVerifySession() {
@@ -1815,11 +1817,15 @@ function loadTurnstileScript(onload) {
 function renderTurnstileWidget() {
   const wrap = $("verifyTurnstileWrap");
   const host = $("verifyTurnstile");
-  if (!window.turnstile || !verifyState.config?.turnstileSiteKey || verifyState.turnstileRendered) return;
+  if (!window.turnstile || !verifyState.config?.turnstileSiteKey) return;
   wrap.hidden = false;
-  verifyState.turnstileRendered = true;
-  window.turnstile.render(host, {
+  if (verifyState.turnstileWidgetId) {
+    window.turnstile.reset(verifyState.turnstileWidgetId);
+    return;
+  }
+  verifyState.turnstileWidgetId = window.turnstile.render(host, {
     sitekey: verifyState.config.turnstileSiteKey,
+    action: "relay",
     theme: "light",
     callback: (token) => {
       verifyState.turnstileToken = token;
@@ -1827,13 +1833,20 @@ function renderTurnstileWidget() {
     },
     "expired-callback": () => {
       verifyState.turnstileToken = "";
-      window.turnstile.reset(host);
+      if (verifyState.turnstileWidgetId) window.turnstile.reset(verifyState.turnstileWidgetId);
     },
     "error-callback": () => {
       verifyState.turnstileToken = "";
       $("verifyStatus").textContent = t("verifyError");
     },
   });
+}
+
+function consumeTurnstileToken() {
+  verifyState.turnstileToken = "";
+  if (verifyState.turnstileWidgetId && window.turnstile) {
+    window.turnstile.reset(verifyState.turnstileWidgetId);
+  }
 }
 
 function tryResolveOverlay() {
