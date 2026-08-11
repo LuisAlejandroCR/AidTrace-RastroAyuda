@@ -88,7 +88,7 @@ Tx: https://celoscan.io/tx/<tx_hash>
 Example public memo:
 
 ```text
-zavu:<message_id> | DELIVER AT-CELO-1 | 100 aguas refugio mayor
+zavu:<message_id> | DELIVER AT-CELO-1 | 100 cajas refugio mayor
 ```
 
 ## Works Offline
