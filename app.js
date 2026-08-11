@@ -167,6 +167,20 @@ const translations = {
     supportStatusLow: "low",
     supportStatusEmpty: "needs funds",
     supportPrintDonate: "Support these Celo records with CELO:",
+    verifyTitle: "Protect this record",
+    verifyIntro: "To help keep AidTrace free of fake submissions, we'll verify your email.",
+    verifyEmail: "Email",
+    verifySendCode: "Send verification code",
+    verifyCodeSent: "Code sent. Check your email.",
+    verifyOtp: "6-digit code",
+    verifyOtpHint: "Code expires in 10 minutes.",
+    verifyConfirm: "Verify",
+    verifyResend: "Resend code",
+    verifyVerified: "Verified. You can now record this proof.",
+    verifyError: "Verification failed. Try again.",
+    verifyTurnstile: "Human check",
+    verifyTurnstileNote: "Complete the check below to continue.",
+    verifyWaiting: "Verification needed before this proof is recorded.",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -307,6 +321,20 @@ const translations = {
     supportStatusLow: "bajo",
     supportStatusEmpty: "sin fondos",
     supportPrintDonate: "Apoya estos registros en Celo con CELO:",
+    verifyTitle: "Protege este registro",
+    verifyIntro: "Para mantener AidTrace libre de reportes falsos, verificaremos tu correo.",
+    verifyEmail: "Correo",
+    verifySendCode: "Enviar codigo de verificacion",
+    verifyCodeSent: "Codigo enviado. Revisa tu correo.",
+    verifyOtp: "Codigo de 6 digitos",
+    verifyOtpHint: "El codigo expira en 10 minutos.",
+    verifyConfirm: "Verificar",
+    verifyResend: "Reenviar codigo",
+    verifyVerified: "Verificado. Ya puedes registrar esta prueba.",
+    verifyError: "Fallo la verificacion. Intenta de nuevo.",
+    verifyTurnstile: "Verificacion humana",
+    verifyTurnstileNote: "Completa el chequeo para continuar.",
+    verifyWaiting: "Se necesita verificacion antes de registrar esta prueba.",
   },
 };
 
@@ -680,21 +708,33 @@ function relayPacket() {
     },
     deviceId: getOrCreateDeviceId(),
     pending: state.events.filter((event) => event.status === "pending"),
+    ...(verifyState.turnstileToken ? { turnstileToken: verifyState.turnstileToken } : {}),
+    ...(verifyState.session?.access_token ? { accessToken: verifyState.session.access_token } : {}),
   };
 }
 
 async function postRelayPacket(useBeacon = false) {
   const pending = state.events.filter((event) => event.status === "pending");
   if (!navigator.onLine || !RELAY_ENDPOINT || !pending.length) return false;
-  const body = JSON.stringify(relayPacket());
+  let body = JSON.stringify(relayPacket());
   if (useBeacon && navigator.sendBeacon) {
     return navigator.sendBeacon(RELAY_ENDPOINT, new Blob([body], { type: "application/json" }));
   }
-  const response = await fetch(RELAY_ENDPOINT, {
+  let response = await fetch(RELAY_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body,
   });
+  if (response.status === 401 || response.status === 403) {
+    const verified = await ensureVerification();
+    if (!verified) throw new Error(`Relay failed: ${response.status}`);
+    body = JSON.stringify(relayPacket());
+    response = await fetch(RELAY_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    });
+  }
   if (!response.ok && response.status !== 207) throw new Error(`Relay failed: ${response.status}`);
   return response.json();
 }
@@ -1512,3 +1552,243 @@ loadOnchainTimeline({ silent: true });
 
   overlay.classList.remove("is-hidden");
 })();
+
+// ── Verify module: Email OTP (Supabase Auth REST) + Turnstile widget ──────────
+// Feature-flagged: only activates when /api/config advertises credentials.
+
+const VERIFY_SESSION_KEY = "aidtrace_verify_session";
+
+const verifyState = {
+  config: null,
+  turnstileToken: "",
+  session: loadVerifySession(),
+  verifyResolve: null,
+  authDone: false,
+  needsAuth: false,
+  needsTurnstile: false,
+  turnstileRendered: false,
+};
+
+function loadVerifySession() {
+  try {
+    const raw = localStorage.getItem(VERIFY_SESSION_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session?.access_token || !session?.user?.id) return null;
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function saveVerifySession(session) {
+  localStorage.setItem(VERIFY_SESSION_KEY, JSON.stringify(session));
+  verifyState.session = session;
+}
+
+async function loadVerifyConfig() {
+  if (verifyState.config) return verifyState.config;
+  try {
+    const response = await fetch(`${APP_ORIGIN}/api/config`, { method: "GET" });
+    if (!response.ok) return null;
+    verifyState.config = await response.json();
+  } catch {
+    verifyState.config = null;
+  }
+  return verifyState.config;
+}
+
+function loadTurnstileScript(onload) {
+  if (window.turnstile) {
+    onload?.();
+    return;
+  }
+  if (document.getElementById("turnstile-script")) {
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries++;
+      if (window.turnstile) {
+        clearInterval(timer);
+        onload?.();
+      } else if (tries > 75) {
+        clearInterval(timer);
+        $("verifyStatus").textContent = t("verifyError");
+      }
+    }, 200);
+    return;
+  }
+  const script = document.createElement("script");
+  script.id = "turnstile-script";
+  script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+  script.async = true;
+  script.onload = onload;
+  document.head.appendChild(script);
+}
+
+function renderTurnstileWidget() {
+  const wrap = $("verifyTurnstileWrap");
+  const host = $("verifyTurnstile");
+  if (!window.turnstile || !verifyState.config?.turnstileSiteKey || verifyState.turnstileRendered) return;
+  wrap.hidden = false;
+  verifyState.turnstileRendered = true;
+  window.turnstile.render(host, {
+    sitekey: verifyState.config.turnstileSiteKey,
+    theme: "light",
+    callback: (token) => {
+      verifyState.turnstileToken = token;
+      tryResolveOverlay();
+    },
+    "expired-callback": () => {
+      verifyState.turnstileToken = "";
+      window.turnstile.reset(host);
+    },
+    "error-callback": () => {
+      verifyState.turnstileToken = "";
+      $("verifyStatus").textContent = t("verifyError");
+    },
+  });
+}
+
+function tryResolveOverlay() {
+  if (!verifyState.verifyResolve) return;
+  const authDone = !verifyState.needsAuth || verifyState.authDone;
+  const turnstileDone = !verifyState.needsTurnstile || Boolean(verifyState.turnstileToken);
+  if (!authDone || !turnstileDone) return;
+  const resolve = verifyState.verifyResolve;
+  verifyState.verifyResolve = null;
+  const overlay = $("verifyOverlay");
+  overlay?.classList.add("is-hidden");
+  resolve(true);
+}
+
+function openVerifyOverlay() {
+  const overlay = $("verifyOverlay");
+  if (!overlay) return Promise.resolve(false);
+  overlay.classList.remove("is-hidden");
+  $("verifyStatus").textContent = "";
+  verifyState.authDone = false;
+  verifyState.needsAuth = Boolean(verifyState.config?.authRequired && !verifyState.session);
+  verifyState.needsTurnstile = Boolean(verifyState.config?.turnstileSiteKey && !verifyState.turnstileToken);
+  $("verifyStepEmail").hidden = !verifyState.needsAuth;
+  $("verifyStepOtp").hidden = true;
+  if (verifyState.needsTurnstile) {
+    loadTurnstileScript(renderTurnstileWidget);
+  } else {
+    $("verifyTurnstileWrap").hidden = true;
+  }
+  return new Promise((resolve) => {
+    verifyState.verifyResolve = (verified) => {
+      overlay.classList.add("is-hidden");
+      resolve(verified);
+    };
+  });
+}
+
+function closeVerifyOverlay() {
+  if (verifyState.verifyResolve) {
+    const resolve = verifyState.verifyResolve;
+    verifyState.verifyResolve = null;
+    resolve(false);
+  }
+}
+
+async function ensureVerification() {
+  const config = await loadVerifyConfig();
+  if (!config) return true;
+
+  const needsAuth = Boolean(config.authRequired && !verifyState.session);
+  const needsTurnstile = Boolean(config.turnstileSiteKey && !verifyState.turnstileToken);
+  if (!needsAuth && !needsTurnstile) return true;
+
+  notify(t("verifyWaiting"));
+  const verified = await openVerifyOverlay();
+  return verified;
+}
+
+async function sendVerifyCode() {
+  const config = await loadVerifyConfig();
+  if (!config) return;
+  const email = $("verifyEmail").value.trim();
+  $("verifyStatus").textContent = "";
+  try {
+    const response = await fetch(`${config.supabaseUrl}/auth/v1/otp`, {
+      method: "POST",
+      headers: {
+        apikey: config.supabaseAnonKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, create_user: true }),
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    $("verifyStatus").textContent = t("verifyCodeSent");
+    $("verifyStepEmail").hidden = true;
+    $("verifyStepOtp").hidden = false;
+    $("verifyOtp").focus();
+  } catch {
+    $("verifyStatus").textContent = t("verifyError");
+  }
+}
+
+async function confirmVerifyCode() {
+  const config = await loadVerifyConfig();
+  if (!config) return;
+  const email = $("verifyEmail").value.trim();
+  const token = $("verifyOtp").value.trim();
+  $("verifyStatus").textContent = "";
+  try {
+    const response = await fetch(`${config.supabaseUrl}/auth/v1/verify`, {
+      method: "POST",
+      headers: {
+        apikey: config.supabaseAnonKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ type: "email", email, token }),
+    });
+    if (!response.ok) throw new Error(String(response.status));
+    const session = await response.json();
+    if (!session?.access_token) throw new Error("no_session");
+    saveVerifySession({
+      access_token: session.access_token,
+      user: { id: session.user?.id || "", email },
+    });
+    verifyState.authDone = true;
+    $("verifyStatus").textContent = t("verifyVerified");
+    tryResolveOverlay();
+  } catch {
+    $("verifyStatus").textContent = t("verifyError");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const sendBtn = $("verifySendCode");
+  if (sendBtn) sendBtn.addEventListener("click", sendVerifyCode);
+  const confirmBtn = $("verifyConfirm");
+  if (confirmBtn) confirmBtn.addEventListener("click", confirmVerifyCode);
+  const closeBtn = $("verifyClose");
+  if (closeBtn) closeBtn.addEventListener("click", closeVerifyOverlay);
+  const resendBtn = $("verifyResend");
+  if (resendBtn) {
+    resendBtn.addEventListener("click", () => {
+      sendVerifyCode();
+      let seconds = 42;
+      resendBtn.disabled = true;
+      resendBtn.textContent = `${seconds}s`;
+      const timer = setInterval(() => {
+        seconds--;
+        if (seconds <= 0) {
+          clearInterval(timer);
+          resendBtn.disabled = false;
+          resendBtn.textContent = t("verifyResend");
+        } else {
+          resendBtn.textContent = `${seconds}s`;
+        }
+      }, 1000);
+    });
+  }
+  $("verifyOtp")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") confirmVerifyCode();
+  });
+  loadVerifyConfig().then((config) => {
+    if (config?.turnstileSiteKey) loadTurnstileScript();
+  });
+});

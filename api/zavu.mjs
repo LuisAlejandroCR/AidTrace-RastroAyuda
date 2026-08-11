@@ -544,7 +544,7 @@ function relayEventToParsed(event) {
   };
 }
 
-async function recordTrustEvidence(item, parsed, txHash) {
+async function recordTrustEvidence(item, parsed, txHash, authorId = null) {
   if (!TRUST_ENABLED || !hasSupabaseQueue()) return null;
 
   const canonical = JSON.stringify({
@@ -563,7 +563,7 @@ async function recordTrustEvidence(item, parsed, txHash) {
       p_batch_id: parsed.batchId,
       p_action_type: parsed.actionType,
       p_details: parsed.details,
-      p_author_id: null,
+      p_author_id: authorId,
       p_evidence_sha256: evidenceHash,
       p_evidence_ref: `browser:${item.id}`,
       p_tx_hash: txHash,
@@ -713,7 +713,7 @@ async function handleBrowserRelay(packet, req, res) {
         actionType: parsed.actionType,
         txHash: result.txHash,
       };
-      const trust = await recordTrustEvidence(item, parsed, result.txHash);
+      const trust = await recordTrustEvidence(item, parsed, result.txHash, verifiedAuthor?.userId || null);
       if (trust) {
         record.reportId = trust.report_id;
         record.evidenceDuplicate = Boolean(trust.duplicate_evidence);

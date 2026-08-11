@@ -1330,6 +1330,57 @@ dd {
   text-align: center;
 }
 
+.verify-card {
+  max-width: 360px;
+  text-align: left;
+}
+
+.verify-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sage-dark);
+  margin: 12px 0 6px;
+}
+
+.verify-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.verify-card .primary,
+.verify-card .secondary {
+  margin-top: 10px;
+  width: 100%;
+}
+
+.verify-hint {
+  font-size: 0.78rem;
+  color: var(--sage-dark);
+  margin: 6px 0 2px;
+}
+
+.verify-status {
+  min-height: 1.1em;
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: var(--sage-dark);
+}
+
+.verify-turnstile {
+  margin-top: 10px;
+  min-height: 65px;
+  display: flex;
+  justify-content: center;
+}
+
 .support-qr {
   margin: 14px 0 8px;
   display: flex;

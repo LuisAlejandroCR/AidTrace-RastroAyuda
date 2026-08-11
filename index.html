@@ -184,6 +184,33 @@
       <p id="networkState" class="visually-hidden">Offline ready</p>
     </main>
 
+    <!-- Email OTP + Turnstile verification overlay (feature-flagged) -->
+    <div id="verifyOverlay" class="demo-overlay is-hidden" role="dialog" aria-modal="true" aria-label="Verify to protect this record">
+      <div class="demo-card verify-card">
+        <button id="verifyClose" class="demo-close" type="button" aria-label="Close">✕</button>
+        <span class="demo-icon">🛡️</span>
+        <h3 class="demo-title" data-i18n="verifyTitle">Protect this record</h3>
+        <p class="demo-body" data-i18n="verifyIntro">To help keep AidTrace free of fake submissions, we'll verify your email.</p>
+        <div id="verifyStepEmail">
+          <label class="verify-label" for="verifyEmail" data-i18n="verifyEmail">Email</label>
+          <input id="verifyEmail" class="verify-input" type="email" placeholder="you@example.com" autocomplete="email" />
+          <button id="verifySendCode" class="primary compact" type="button" data-i18n="verifySendCode">Send verification code</button>
+        </div>
+        <div id="verifyStepOtp" hidden>
+          <label class="verify-label" for="verifyOtp" data-i18n="verifyOtp">6-digit code</label>
+          <input id="verifyOtp" class="verify-input" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" />
+          <p class="verify-hint" data-i18n="verifyOtpHint">Code expires in 10 minutes.</p>
+          <button id="verifyConfirm" class="primary compact" type="button" data-i18n="verifyConfirm">Verify</button>
+          <button id="verifyResend" class="secondary compact" type="button" data-i18n="verifyResend">Resend in 42s</button>
+        </div>
+        <div id="verifyTurnstileWrap" hidden>
+          <p class="verify-hint" data-i18n="verifyTurnstileNote">Complete the check below to continue.</p>
+          <div id="verifyTurnstile" class="verify-turnstile"></div>
+        </div>
+        <p id="verifyStatus" class="verify-status" role="status"></p>
+      </div>
+    </div>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <template id="itemTemplate">
