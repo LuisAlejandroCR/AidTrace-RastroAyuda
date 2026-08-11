@@ -139,7 +139,9 @@ SUPABASE_SERVICE_ROLE_KEY=<service role key>
 
 Optional: `AIDTRACE_RELAYER_ADDRESS` (defaults to live relayer), `AIDTRACE_WEBHOOK_TOKEN` (requires Zavu custom header support, see `scripts/webhook-token-setup.md`).
 
-Optional anti-troll hardening — when set, field devices must pass a Cloudflare Turnstile widget and/or an email OTP before their proofs are accepted: `AIDTRACE_TURNSTILE_SITE_KEY` + `AIDTRACE_TURNSTILE_SECRET_KEY`, `SUPABASE_ANON_KEY`, `AIDTRACE_REQUIRE_AUTH=true`. Optional wallet funding: `PRIVY_APP_ID` (Privy modal to send CELO to the relayer wallet from any wallet). Optional Turnstile hardening: `AIDTRACE_TURNSTILE_ACTION` (default `relay`), `AIDTRACE_TURNSTILE_HOSTNAMES` (comma-separated hostname allowlist checked by siteverify — set to your production domain, never `localhost`).
+Optional anti-troll hardening — when set, field devices must pass a Cloudflare Turnstile widget and/or an email OTP before their proofs are accepted: `AIDTRACE_TURNSTILE_SITE_KEY` + `AIDTRACE_TURNSTILE_SECRET_KEY`, `SUPABASE_ANON_KEY`, `AIDTRACE_REQUIRE_AUTH=true`. Optional Turnstile hardening: `AIDTRACE_TURNSTILE_ACTION` (default `relay`), `AIDTRACE_TURNSTILE_HOSTNAMES` (comma-separated hostname allowlist checked by siteverify — set to your production domain, never `localhost`).
+
+Relayer wallet funding has no server config — the Support (♡) modal shows the address, a QR code, wallet deep links (MetaMask/Trust/Rabby/Coinbase), and P2P/exchange links (Kraken, Binance P2P, Noones, Allbridge) to fund it directly.
 
 **Supabase SQL setup** — run in order in the Supabase SQL editor:
 

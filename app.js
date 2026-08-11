@@ -162,16 +162,9 @@ const translations = {
     supportWalletPaste: "Address copied - paste it in your wallet",
     supportOtherWallet: "Other",
     supportFundingTitle: "How to fund the wallet (no crypto experience)",
-    fundStep1: "Buy CELO on an exchange (<a href=\"https://www.kraken.com/prices/celo\" target=\"_blank\" rel=\"noreferrer\">Kraken</a>, Binance, Coinbase, local) and withdraw to this address - always pick the Celo network (42220), never Ethereum.",
-    fundStep2: "No bank card? Buy crypto P2P with cash, transfer or mobile money: <a href=\"https://p2p.binance.com/en\" target=\"_blank\" rel=\"noreferrer\">Binance P2P</a> or <a href=\"https://noones.com\" target=\"_blank\" rel=\"noreferrer\">Noones</a>.",
-    fundStep3: "Easiest: ask a friend with crypto to scan the QR, or bridge any USDC with <a href=\"https://app.allbridge.io/\" target=\"_blank\" rel=\"noreferrer\">Allbridge</a>. Small amounts are enough - ~0.1 CELO per proof.",
-    privyConnect: "Send with any wallet",
-    privyUnavailable: "Wallet payments are not configured on this deployment.",
-    privyFailed: "Could not connect the wallet. Try again.",
-    privyConnected: "connected",
-    privySending: "Confirm the transaction in your wallet.",
-    privySent: "Thanks! Your contribution will appear in the balance below.",
-    privyCancelled: "Transaction cancelled.",
+    fundStep1: "Exchange: buy CELO on <a href=\"https://www.kraken.com/prices/celo\" target=\"_blank\" rel=\"noreferrer\">Kraken</a>, Binance, or Coinbase and withdraw to this address on the Celo network (42220).",
+    fundStep2: "No card? P2P with cash or mobile money via <a href=\"https://p2p.binance.com/en\" target=\"_blank\" rel=\"noreferrer\">Binance P2P</a> or <a href=\"https://noones.com\" target=\"_blank\" rel=\"noreferrer\">Noones</a>.",
+    fundStep3: "Already have crypto elsewhere? Bridge it with <a href=\"https://app.allbridge.io/\" target=\"_blank\" rel=\"noreferrer\">Allbridge</a>. ~0.1 CELO covers a proof.",
     supportCopied: "Copied!",
     supportViewOnChain: "View on Celoscan",
     supportBalance: "Relayer balance",
@@ -332,16 +325,9 @@ const translations = {
     supportWalletPaste: "Direccion copiada - pega la en tu billetera",
     supportOtherWallet: "Otra",
     supportFundingTitle: "Como fondear la billetera (sin experiencia en cripto)",
-    fundStep1: "Compra CELO en un exchange (<a href=\"https://www.kraken.com/prices/celo\" target=\"_blank\" rel=\"noreferrer\">Kraken</a>, Binance, Coinbase, local) y retira a esta direccion - siempre elige la red Celo (42220), nunca Ethereum.",
-    fundStep2: "Sin tarjeta? Compra cripto P2P con efectivo, transferencia o dinero movil: <a href=\"https://p2p.binance.com/es\" target=\"_blank\" rel=\"noreferrer\">Binance P2P</a> o <a href=\"https://noones.com\" target=\"_blank\" rel=\"noreferrer\">Noones</a>.",
-    fundStep3: "Mas facil: pide a un amigo con cripto que escanee el QR, o puentea cualquier USDC con <a href=\"https://app.allbridge.io/\" target=\"_blank\" rel=\"noreferrer\">Allbridge</a>. Con montos pequenos basta - ~0.1 CELO por prueba.",
-    privyConnect: "Enviar con cualquier billetera",
-    privyUnavailable: "Los pagos con billetera no estan configurados en este despliegue.",
-    privyFailed: "No se pudo conectar la billetera. Intenta de nuevo.",
-    privyConnected: "conectada",
-    privySending: "Confirma la transaccion en tu billetera.",
-    privySent: "Gracias! Tu contribucion aparecera en el saldo de abajo.",
-    privyCancelled: "Transaccion cancelada.",
+    fundStep1: "Exchange: compra CELO en <a href=\"https://www.kraken.com/prices/celo\" target=\"_blank\" rel=\"noreferrer\">Kraken</a>, Binance o Coinbase y retira a esta direccion en la red Celo (42220).",
+    fundStep2: "Sin tarjeta? P2P con efectivo o dinero movil via <a href=\"https://p2p.binance.com/es\" target=\"_blank\" rel=\"noreferrer\">Binance P2P</a> o <a href=\"https://noones.com\" target=\"_blank\" rel=\"noreferrer\">Noones</a>.",
+    fundStep3: "Ya tienes cripto en otra red? Puentea con <a href=\"https://app.allbridge.io/\" target=\"_blank\" rel=\"noreferrer\">Allbridge</a>. ~0.1 CELO cubre una prueba.",
     supportCopied: "¡Copiado!",
     supportViewOnChain: "Ver en Celoscan",
     supportBalance: "Saldo del relayer",
@@ -1468,35 +1454,58 @@ function renderSupportQr() {
   box.dataset.rendered = "1";
 }
 
+function selectAddressText() {
+  const el = $("supportAddress");
+  if (!el || !window.getSelection) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 async function copyRelayerAddress() {
   const text = RELAYER_ADDRESS;
   let copied = false;
+
+  // execCommand first, synchronously, inside the original click gesture — some
+  // in-app webviews (Telegram, WhatsApp) and Safari drop "trusted user gesture"
+  // status across an await, which breaks execCommand if it runs after a failed
+  // clipboard.writeText attempt.
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
   try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      copied = true;
-    }
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    copied = document.execCommand("copy");
   } catch {
     copied = false;
+  } finally {
+    document.body.removeChild(ta);
   }
+
   if (!copied) {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.setAttribute("readonly", "");
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
     try {
-      ta.focus();
-      ta.select();
-      ta.setSelectionRange(0, ta.value.length);
-      copied = document.execCommand("copy");
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
     } catch {
       copied = false;
-    } finally {
-      document.body.removeChild(ta);
     }
   }
+
+  if (!copied) {
+    // Last resort: highlight the visible address so the user can copy it with
+    // a native long-press / right-click, even if every programmatic path is blocked.
+    selectAddressText();
+  }
+
   notify(copied ? t("supportCopied") : t("supportCopyFailed"));
 }
 
@@ -1522,7 +1531,7 @@ function renderFundingSteps() {
   const list = $("supportFundingSteps");
   if (!list || list.dataset.rendered) return;
   list.dataset.rendered = "1";
-  list.innerHTML = [t("fundStep1"), t("fundStep2"), t("fundStep3"), t("fundStep4"), t("fundStep5")]
+  list.innerHTML = [t("fundStep1"), t("fundStep2"), t("fundStep3")]
     .map((step) => `<li>${step}</li>`)
     .join("");
 }
@@ -1535,94 +1544,6 @@ document.querySelectorAll(".wallet-btn").forEach((btn) =>
   btn.addEventListener("click", () => openRelayerWallet(btn.dataset.wallet)),
 );
 
-// ── Privy wallet funding (optional, feature-flagged via /api/config) ──────────
-let privyProvider = null;
-const RELAYER_AMOUNT_WEI = {
-  "0.5": "0x6F05B59D3B20000",
-  "1": "0xDE0B6B3A7640000",
-  "5": "0x4563918244F40000",
-};
-
-function loadPrivyScript() {
-  return new Promise((resolve) => {
-    if (window.PrivyProvider) return resolve();
-    if (document.getElementById("privy-script")) {
-      const tries = setInterval(() => {
-        if (window.PrivyProvider) {
-          clearInterval(tries);
-          resolve();
-        }
-      }, 200);
-      return;
-    }
-    const script = document.createElement("script");
-    script.id = "privy-script";
-    script.src = "https://cdn.privy.io/privy-browser.js";
-    script.async = true;
-    script.onload = () => resolve();
-    document.head.appendChild(script);
-  });
-}
-
-async function ensurePrivy() {
-  const config = await loadVerifyConfig();
-  if (!verifyState.config?.privyAppId) {
-    $("privyStatus").textContent = t("privyUnavailable");
-    return false;
-  }
-  await loadPrivyScript();
-  if (!privyProvider) {
-    privyProvider = new window.PrivyProvider({
-      appId: verifyState.config.privyAppId,
-      config: {
-        embeddedWallets: { createOnLogin: "off" },
-        defaultChain: { id: 42220, name: "Celo" },
-      },
-    });
-  }
-  return true;
-}
-
-function shortAddress(addr) {
-  return addr ? `${addr.slice(0, 6)}\u2026${addr.slice(-4)}` : "";
-}
-
-async function connectPrivyWallet() {
-  $("privyStatus").textContent = "";
-  if (!(await ensurePrivy())) return;
-  try {
-    await privyProvider.authenticate();
-    const user = privyProvider.getAuthenticatedUser();
-    const wallet = user?.wallets?.[0];
-    if (!wallet) throw new Error("no wallet");
-    $("privyConnectBtn").hidden = true;
-    $("privyActive").hidden = false;
-    $("privyWalletAddr").textContent = `${shortAddress(wallet.address)} (${t("privyConnected")})`;
-  } catch {
-    $("privyStatus").textContent = t("privyFailed");
-  }
-}
-
-async function sendToRelayer(amount) {
-  if (!privyProvider) return;
-  const wei = RELAYER_AMOUNT_WEI[String(amount)] || RELAYER_AMOUNT_WEI["1"];
-  $("privyStatus").textContent = t("privySending");
-  try {
-    await privyProvider.request({
-      method: "eth_sendTransaction",
-      params: [{ to: RELAYER_ADDRESS, value: wei }],
-    });
-    $("privyStatus").textContent = t("privySent");
-    loadSupportBalance();
-  } catch {
-    $("privyStatus").textContent = t("privyCancelled");
-  }
-}
-
-$("privyConnectBtn")?.addEventListener("click", connectPrivyWallet);
-document.querySelectorAll("[data-privy-amount]").forEach((btn) =>
-  btn.addEventListener("click", () => sendToRelayer(btn.dataset.privyAmount)),
-);
 $("supportOverlay")?.addEventListener("click", (event) => {
   if (event.target === $("supportOverlay")) closeSupport();
 });
