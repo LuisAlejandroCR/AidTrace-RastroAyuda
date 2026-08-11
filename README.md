@@ -11,126 +11,51 @@
 <p align="center">
   <img alt="Celo Mainnet" src="https://img.shields.io/badge/Celo-Mainnet%2042220-35D07F">
   <img alt="PWA" src="https://img.shields.io/badge/PWA-offline--first-5A67D8">
-  <img alt="Solidity" src="https://img.shields.io/badge/Solidity-AidTraceLedger-363636?logo=solidity&logoColor=white">
   <img alt="Telegram" src="https://img.shields.io/badge/Telegram-Zavu%20channel-26A5E4?logo=telegram&logoColor=white">
-  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres-3ECF8E?logo=supabase&logoColor=white">
   <a href="https://github.com/LuisAlejandroCR/AidTrace-RastroAyuda/commits/main"><img alt="Último commit" src="https://img.shields.io/github/last-commit/LuisAlejandroCR/AidTrace-RastroAyuda?display_timestamp=committer&label=last%20commit"></a>
-  <a href="https://github.com/LuisAlejandroCR/AidTrace-RastroAyuda/graphs/contributors"><img alt="Contribuidores" src="https://img.shields.io/github/contributors/LuisAlejandroCR/AidTrace-RastroAyuda"></a>
 </p>
 
 ---
 
-## Why It Matters
+## Who Is AidTrace For
 
-After earthquakes, floods, or similar disasters, people need to know where water, food, medicine, and shelter kits are moving. Paper notes get lost, connectivity fails, and donors cannot easily audit delivery.
+| Persona | What they do |
+|:--|:--|
+| **Field operator** | Scans the QR or sends a Telegram message to record pickups, deliveries, and reviews. |
+| **Coordinator** | Creates aid batches, prints QR labels, assigns destinations. |
+| **Supervisor** | Opens the timeline and audits every event on Celo. |
+| **Donor** | Follows a transaction link and reads the public audit memo — no account needed. |
 
-AidTrace gives each aid batch a short code and a printable QR label. Every pickup, delivery, or review creates a proof that can be checked on Celo without asking field users to hold a wallet or pay network fees.
+## How It Works
+
+1. A coordinator creates a new aid batch — AidTrace generates a short code and a printable QR label.
+2. Field teams scan the QR or type the batch code to add updates.
+3. If the browser is offline, the update stays on the device and syncs automatically when internet returns.
+4. Every update is written as a proof on **Celo Mainnet**.
+5. Supervisors open the timeline and audit each proof through its transaction link.
 
 > [!IMPORTANT]
-> Field users should never handle private keys, wallets, CELO, or network fees. AidTrace abstracts the chain completely — the relayer pays, the ledger proves, and the donor audits with a transaction link.
+> Field users never need a wallet, CELO, or network fees. AidTrace abstracts the chain completely — the relayer pays, the ledger proves, and anyone can audit with a link.
 
-## What AidTrace Does
+## Quick Start
 
-| Capability | How |
-|:--|:--|
-| **QR label per batch** | Short code + printable label, with a small donation strip carrying the relayer address (EN/ES) so every label doubles as a fundraiser. |
-| **Offline-first PWA** | Records live locally when the network fails and sync automatically when it returns. |
-| **Verified proofs on Celo** | Every pickup/delivery/review lands in `AidTraceLedger` — public, immutable, auditable via Celoscan logs. |
-| **Telegram reporting** | Field operators send one text message (`CELO1 depositar 100 aguas...`) and get a transaction link back. SMS and WhatsApp are planned channel adapters. |
-| **Live relayer status** | A public endpoint (`GET /api/relayer-status`) shows relayer balance, gas price, and estimated proofs-left for a live funding widget. |
-| **Relayer watchdog** | A GitHub workflow checks every 6h and alerts via Telegram when the relayer is about to run out of gas. |
-| **Durable queue + timeline index** | Supabase Postgres serializes Celo writes (no double-spends) and serves bounded timeline reads without full-chain scans. |
+Try the live demo: [aidtrace-rastroayuda.vercel.app](https://aidtrace-rastroayuda.vercel.app)
 
-## How The App Layer Works
+**Make a label**
 
-1. A coordinator opens AidTrace and creates a new aid batch.
-2. AidTrace generates a QR label with a short batch code.
-3. Field teams scan the QR or type the batch code to add updates.
-4. If the browser is offline, the update stays on the device.
-5. When the browser is online again, AidTrace syncs pending proofs automatically.
-6. Supervisors open the timeline and audit each proof through the Celo transaction link.
+1. Open AidTrace and select the supply type.
+2. Add quantity, origin, destination, and notes.
+3. Press `Create QR`, then save or print the label.
 
-The app also supports Telegram reports. If a field user has mobile data but cannot use the browser, they can send a simple text message to the bot.
-
-## Offline Behavior
-
-AidTrace is designed for damaged or unstable networks:
-
-- Browser records are stored locally first.
-- Pending records sync automatically when internet returns.
-- The app warns before closing or reloading while offline or while proofs are still pending.
-- Telegram messages are queued while offline; when Telegram reconnects, the backend processes the messages one by one before writing them to Celo.
-
-## Architecture
-
-```text
-┌───────────────┐        ┌────────────────┐        ┌───────────────────────┐
-│ Browser PWA   │        │ /api/zavu      │        │ AidTraceLedger        │
-│ offline-first │───────▶│ browser relay  │───────▶│ Celo Mainnet · 42220  │
-└───────────────┘        └────────────────┘        └───────────┬───────────┘
-┌───────────────┐        ┌────────────────┐                    │ event logs
-│ Telegram bot  │───────▶│ Zavu webhook   │──┐                 │
-│ field report  │        │ (signed)       │  │                 │
-└───────────────┘        └────────────────┘  │   ┌─────────┐   │
-                                             ├──▶│ Supabase│◀──┘
-┌───────────────┐        ┌────────────────┐  │   │ queue + │
-│ Supervisor    │◀───────│ /api/timeline  │◀─┘   │ index   │
-│ timeline      │        │ (indexed reads)│      └─────────┘
-└───────────────┘        └────────────────┘
-```
-
-A static PWA relays browser proofs through `/api/zavu`; Telegram reports arrive through the Zavu webhook; both write to `AidTraceLedger`. A Supabase Postgres lock serializes writes from the relayer wallet so no two proofs race. The timeline reads indexed Celo logs via `/api/timeline`, falling back to a direct scan only when indexing is disabled.
-
-## Stack
-
-| Capa | Tecnologías | Responsabilidad |
-|:--|:--|:--|
-| **Frontend** | Vanilla JS PWA (no build), service worker, local QR generator | UI, offline queue, QR/PDF labels, timeline rendering |
-| **Backend** | Node.js serverless (`api/*.mjs` on Vercel) | Browser relay, Zavu webhook, timeline reads, protected queue worker |
-| **Cadena** | Celo Mainnet, Solidity `AidTraceLedger` | Immutable proof ledger — public audit memo in transaction `data / referenceURI` |
-| **Canales** | Telegram via Zavu (SMS/WhatsApp planned) | Field reporting with one text message |
-| **Persistencia** | Supabase Postgres | Durable queue, relay idempotency + rate guard, indexed timeline cache |
-| **Infra** | Vercel + GitHub Actions | Hosting, scheduled queue processing, relayer balance alert |
-
-## Browser Use
-
-Create a QR label:
-
-1. Open AidTrace.
-2. Select the supply type.
-3. Add quantity, origin, destination, and notes.
-4. Press `Create QR`.
-5. Save or print the QR label.
-
-Record a custody update:
+**Record a custody update**
 
 1. Scan the QR or open the `Update` screen.
-2. Choose the action.
-3. Add operator, location, and evidence note.
-4. Press `Save label`.
-5. If offline, keep working. AidTrace will sync automatically later.
+2. Choose the action, add operator, location, and evidence note.
+3. Press `Save label`. If offline, keep working — it will sync later.
 
-Audit:
+## Report From the Field With Telegram
 
-1. Open `Timeline` / `Historial`.
-2. Open `View Celo transaction` / `Ver transaccion en Celo`.
-3. In Celoscan, go to `Logs`.
-4. Scroll to `data` / `referenceURI`.
-5. Read the public audit memo.
-
-Example public memo:
-
-```text
-zavu:<message_id> | DELIVER AT-CELO-1 | 100 aguas refugio mayor
-```
-
-## Telegram Use
-
-Use short natural commands. The first number belongs to the batch code; numbers after the action are treated as details.
-
-Note: `CELO1` is a keyword to help the Telegram bot identify the batch id.
-
-Examples:
+Send a short text message. The first number is the batch code; words after the action are details.
 
 ```text
 CELO1 depositar 100 aguas refugio mayor
@@ -139,59 +64,60 @@ CELO1 recoger centro de acopio norte
 CELO1 revisar faltan 3 cajas
 ```
 
-Main words:
+| Word | Meaning |
+|:--|:--|
+| `depositar` / `entregar` | delivery proof |
+| `recoger` / `recibir` | pickup proof |
+| `revisar` / `reporte` | review or issue proof |
+| `CELO1` / `LOTE 1` | short code for batch `AT-CELO-1` |
 
-```text
-depositar / entregar -> delivery proof
-recoger / recibir    -> pickup proof
-revisar / reporte    -> review or issue proof
-CELO1 / LOTE 1       -> short batch code for AT-CELO-1
-```
-
-Bot reply:
+The bot replies with a Celoscan link:
 
 ```text
 Registrado en Celo: DELIVER AT-CELO-1
 Detalles: 100 aguas refugio mayor
 Tx: https://celoscan.io/tx/<tx_hash>
-Auditoria: abre el link, ve a Logs y baja hasta data / referenceURI.
 ```
 
-## Current Live Setup
+## Audit on Celo
+
+1. Open `Timeline` / `Historial`.
+2. Open `View Celo transaction` / `Ver transaccion en Celo`.
+3. In Celoscan, go to `Logs` and scroll to `data` / `referenceURI`.
+
+Example public memo:
 
 ```text
-Network: Celo Mainnet
-Chain ID: 42220
-RPC: https://forno.celo.org
-Contract: 0xaf5c40e82ac9255479a1f447e81992b71c4f4934
+zavu:<message_id> | DELIVER AT-CELO-1 | 100 aguas refugio mayor
+```
+
+## Works Offline
+
+- Records are stored locally first and sync automatically when internet returns.
+- The app warns before closing while offline or with proofs still pending.
+- Telegram messages queue while offline and are processed one by one when the connection returns.
+
+## Live Network
+
+```text
+Network: Celo Mainnet · Chain ID: 42220 · RPC: https://forno.celo.org
+Contract: 0xaf5c40e82ac9255479a1f447e81992b71c4f4934 (verified on Celoscan)
 Admin and funding wallet: 0x326F24884FAFA1810034F4F6Dd41d280fB500569
-```
-
-Donor funding standard:
-
-```text
 USDC on Celo: 0xcebA9300f2b948710d2653dD7B07f33A8B32118C
 USDC fee adapter for relayer txs: 0x2F25deB3848C207fc8E0c34035B3Ba7fC157602B
 ```
 
-Zavu channel policy:
+---
 
-```text
-Live demo: Telegram
-Browser fallback: offline-first PWA queue
-Future fallback: two-way SMS
-Future operator flow: WhatsApp Business
-```
+## For Developers (Minimum to Deploy)
 
-## Local Development
-
-Static preview:
+**Local run**
 
 ```powershell
 npx serve .
 ```
 
-Local verification:
+**Local verification**
 
 ```powershell
 npm.cmd run test
@@ -199,13 +125,11 @@ npm.cmd run check
 .\scripts\final-demo-check.ps1 -SkipRemote
 ```
 
-## Deployment
-
-### Vercel envs (required)
+**Vercel envs (required)**
 
 ```text
 AIDTRACE_CONTRACT=0xaf5c40e82ac9255479a1f447e81992b71c4f4934
-AIDTRACE_ALLOWED_ORIGINS=https://aidtrace-rastroayuda.vercel.app,http://127.0.0.1:8017,http://localhost:8017
+AIDTRACE_ALLOWED_ORIGINS=https://aidtrace-rastroayuda.vercel.app,http://localhost:8017,http://127.0.0.1:8017
 AIDTRACE_MAX_BROWSER_RELAY_ITEMS=20
 RASTROAYUDA_RELAYER_PRIVATE_KEY=<relayer private key, not admin key>
 RASTROAYUDA_ZAVU_API_KEY=<zv_live_...>
@@ -213,207 +137,45 @@ SUPABASE_URL=<project url>
 SUPABASE_SERVICE_ROLE_KEY=<service role key>
 ```
 
-Optional relay status env:
+Optional: `AIDTRACE_RELAYER_ADDRESS` (defaults to live relayer), `AIDTRACE_WEBHOOK_TOKEN` (requires Zavu custom header support, see `scripts/webhook-token-setup.md`).
+
+**Supabase SQL setup** — run in order in the Supabase SQL editor:
 
 ```text
-AIDTRACE_RELAYER_ADDRESS=<relayer public address; defaults to the live relayer>
+supabase/aidtrace_queue.sql
+supabase/aidtrace_relay_guard.sql
+supabase/aidtrace_timeline.sql
+supabase/security_hardening.sql   (LAST — locks down SECURITY DEFINER RPCs)
 ```
 
-The public `GET /api/relayer-status` endpoint returns the relayer CELO balance, current gas price, and an estimated proofs-left count so the support card can show live funding status.
-
-Optional relayer alert (GitHub):
+**GitHub repository secrets**
 
 ```text
-Repository variable:  AIDTRACE_ALERT_THRESHOLD (default 50 proofs left)
-Repository secrets:  RASTROAYUDA_ZAVU_API_KEY, AIDTRACE_CENTER_NOTIFY_CHAT
+RASTROAYUDA_ZAVU_API_KEY, AIDTRACE_CENTER_NOTIFY_CHAT   (relayer balance alert)
+AIDTRACE_QUEUE_WORKER_TOKEN                             (queue worker, same as Vercel)
+AIDTRACE_APP_URL=https://aidtrace-rastroayuda.vercel.app (repository variable)
 ```
 
-`.github/workflows/relayer-alert.yml` checks `/api/relayer-status` every 6 hours and sends a Telegram alert through Zavu when the estimated proofs left drops below the threshold, so the relayer is never silently out of gas again.
+**Runbooks**: `scripts/relayer-rotation.md` (key rotation/emergency), `scripts/webhook-token-setup.md` (webhook hardening), `AUDIT_BLOCKS.md` (security readiness and pending tasks).
 
-Optional timeline index env:
-
-```text
-AIDTRACE_TIMELINE_INDEX_ENABLED=true
-```
-
-Timeline indexing is enabled automatically when Supabase service envs exist. Set `AIDTRACE_TIMELINE_INDEX_ENABLED=false` only if you need to fall back to direct Celo log scans.
-
-Optional durable queue envs:
-
-```text
-AIDTRACE_QUEUE_ENABLED=true
-AIDTRACE_QUEUE_WORKER_TOKEN=<random long token>
-AIDTRACE_QUEUE_LOCK_SECONDS=120
-AIDTRACE_QUEUE_MAX_ATTEMPTS=8
-AIDTRACE_QUEUE_BATCH_SIZE=3
-AIDTRACE_QUEUE_PROCESS_ON_INBOUND=true
-AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT=2
-```
-
-Only enable `AIDTRACE_QUEUE_ENABLED=true` after `supabase/aidtrace_queue.sql` has been run in Supabase. This queues Telegram/Zavu inbound messages so reconnect bursts are processed one by one. Browser offline proofs still use the direct relay path and return a transaction hash to the UI.
-
-The protected worker endpoint is `POST /api/process-queue` with `X-AidTrace-Worker-Token: <token>` or `Authorization: Bearer <token>`.
-
-`AIDTRACE_QUEUE_PROCESS_ON_INBOUND` is enabled by default. After Zavu receives a Telegram message, AidTrace stores it, sends the queued acknowledgement, then kicks up to `AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT` queued writes immediately. GitHub Actions and the manual worker remain the retry fallback.
-
-Optional browser queue flag:
-
-```text
-AIDTRACE_BROWSER_QUEUE_ENABLED=true
-```
-
-Leave `AIDTRACE_BROWSER_QUEUE_ENABLED` unset for the demo unless the UI is updated to track queued browser proofs without an immediate transaction hash.
-
-Optional browser relay guard:
-
-```text
-AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true
-AIDTRACE_BROWSER_RELAY_RATE_LIMIT=30
-```
-
-Run `supabase/aidtrace_relay_guard.sql` before setting `AIDTRACE_BROWSER_RELAY_GUARD_ENABLED=true`. The guard stores browser event ids so retries do not create duplicate Celo writes, and rate-limits repeated browser relay attempts by IP + batch id + minute.
-
-Optional webhook hardening:
-
-```text
-AIDTRACE_WEBHOOK_TOKEN=<random long token>
-```
-
-Only set `AIDTRACE_WEBHOOK_TOKEN` after Zavu is configured to send the same value as `X-AidTrace-Webhook-Token` or `Authorization: Bearer <token>` with inbound webhook requests. Prove this first with the header probe in `scripts/webhook-token-setup.md`. If Zavu cannot attach custom headers, keep this env unset for the demo or add a server-side Zavu Function/proxy that forwards inbound events with the header attached.
-
-### GitHub Actions
-
-Automatic queue worker:
-
-```text
-.github/workflows/process-queue.yml
-```
-
-GitHub Actions calls `/api/process-queue?limit=3` every 5 minutes and can also be run manually from the Actions tab.
-
-Required GitHub repository secret:
-
-```text
-AIDTRACE_QUEUE_WORKER_TOKEN=<same value used in Vercel>
-```
-
-Optional GitHub repository variable:
-
-```text
-AIDTRACE_APP_URL=https://aidtrace-rastroayuda.vercel.app
-```
-
-GitHub scheduled workflows run from the default branch and may start a few minutes late. For a live demo, the manual worker command below is still useful as a backup.
-
-Manual worker smoke test:
+**Deployed smoke check**
 
 ```powershell
-$env:AIDTRACE_QUEUE_WORKER_TOKEN="<same token used in Vercel>"
-Invoke-RestMethod -Method POST `
-  -Uri "https://aidtrace-rastroayuda.vercel.app/api/process-queue?limit=3" `
-  -Headers @{ "X-AidTrace-Worker-Token" = $env:AIDTRACE_QUEUE_WORKER_TOKEN }
+.\scripts\final-demo-check.ps1 -BaseUrl "https://aidtrace-rastroayuda.vercel.app" -Origin "https://aidtrace-rastroayuda.vercel.app"
 ```
 
-### Supabase setup
+## Security & Privacy
 
-```text
-Run supabase/aidtrace_queue.sql in the Supabase SQL editor before wiring queue-backed processing.
-Run supabase/aidtrace_relay_guard.sql in the Supabase SQL editor before enabling browser relay idempotency/rate limiting.
-Run supabase/aidtrace_timeline.sql in the Supabase SQL editor before using indexed timeline reads.
-Run supabase/security_hardening.sql LAST — revokes EXECUTE on every SECURITY DEFINER RPC from the anon key so the public cannot enqueue/complete/register rows directly.
-```
-
-### Setup and rollback runbooks
-
-```text
-scripts/webhook-token-setup.md   Zavu inbound webhook token setup and rollback
-scripts/relayer-rotation.md      Relayer key rotation and emergency revocation
-```
-
-## Contract Notes
-
-`CONTRACT_ADDRESS` must be the deployed `AidTraceLedger` address. It is not the admin wallet.
-
-The contract is already verified:
-
-```text
-https://celoscan.io/address/0xaf5c40e82ac9255479a1f447e81992b71c4f4934#code
-```
-
-Use the existing contract for new flows. Avoid redeploying just to add labels, parser words, or new off-chain metadata.
-
-Relayer recovery: use `scripts/relayer-rotation.md` if `RASTROAYUDA_RELAYER_PRIVATE_KEY` is exposed or if the hot key needs to be replaced. Keep `RastroAyuda_Admin` separate from the relayer key.
-
-## Project Files
-
-```text
-index.html                  Static app shell and timeline controls
-styles.css                  Responsive UI, mobile form behavior, print styles
-app.js                      PWA state, offline queue, QR/PDF, timeline rendering
-sw.js                       Service worker cache and background sync handoff
-qrcode.js                   Local QR generator
-assets/icons/*.png          PWA install icons
-api/zavu.mjs                Browser relay endpoint and Zavu Telegram webhook
-api/process-queue.mjs       Protected queue worker that processes one Supabase queued Celo write per call
-api/timeline.mjs            Celo timeline reader with Supabase index fallback
-api/relayer-status.mjs      Public relayer wallet balance for the support card (GET /api/relayer-status)
-AidTraceLedger.sol          On-chain proof ledger
-scripts/send-zavu-message.mjs Outbound channel smoke test
-scripts/relayer-alert.mjs     Balance watchdog — Telegram alert when relayer proofs left drop below threshold
-scripts/final-demo-check.ps1 Final local + deployed endpoint smoke checks
-supabase/aidtrace_queue.sql Supabase durable queue table and RPCs for serialized Celo writes
-supabase/aidtrace_relay_guard.sql Supabase browser relay idempotency and per-minute abuse guard
-supabase/aidtrace_timeline.sql Supabase indexed timeline cache for bounded reads
-```
-
-## Verification
-
-Run these checks before opening a pull request:
-
-```powershell
-npm.cmd run test
-npm.cmd run check
-.\scripts\final-demo-check.ps1 -SkipRemote
-```
-
-End-to-end test path:
-
-1. Create a QR in the browser.
-2. Save or print the label.
-3. Open the QR on mobile and add a custody event.
-4. Switch offline and add another event.
-5. Restore internet and confirm automatic sync.
-6. Send Telegram: `CELO1 depositar 100 aguas refugio mayor`.
-7. Confirm the bot replies with a Celoscan transaction link.
-8. Open the transaction and inspect `referenceURI`.
-9. Confirm the event appears in the app timeline.
-10. Call `/api/timeline?limit=30` twice and confirm the second call returns from the indexed cache without a full historical scan.
-11. If `pagination.nextCursor` is present, call `/api/timeline?limit=30&cursor=<nextCursor>` to inspect the next page.
-
-Final deployed smoke check:
-
-```powershell
-.\scripts\final-demo-check.ps1 `
-  -BaseUrl "https://aidtrace-rastroayuda.vercel.app" `
-  -Origin "https://aidtrace-rastroayuda.vercel.app"
-```
-
-## Security / Readiness
-
-`AUDIT_BLOCKS.md` keeps the blocked audit plan for relay auth, queue, timeline indexing, key rotation, CORS, tests, CI, and PWA installability. The final pending task registry lives at the end of that file with task IDs, priorities, files/envs, and acceptance checks — check it before deploying or presenting, especially `P0-01 - AIDTRACE_WEBHOOK_TOKEN`.
-
-## Notes
-
-Zavu credits and Celo relayer funds are separate. Zavu is paid through the dashboard. Celo relayer fees are funded through the project wallet.
+- Public: contribution status, proof timestamps, audit links, evidence count.
+- Private: emails, IPs, internal signals, moderation notes.
+- Never expose personal information on-chain — Celo stores only the proof hash and audit memo.
 
 ## Contributing
 
 1. Create a descriptive branch from `main`.
-2. Keep each change focused and accompany it with tests when applicable.
-3. Run the full verification block above.
+2. Keep each change focused; add tests when applicable.
+3. Run `npm.cmd run test` and `npm.cmd run check`.
 4. Open a pull request explaining the problem, the solution, and how it was validated.
-
-Preserve the project principles: privacy by design, minimum necessary access, no wallet/keys for field users, and an experience that works on damaged networks.
 
 ## Contributors
 

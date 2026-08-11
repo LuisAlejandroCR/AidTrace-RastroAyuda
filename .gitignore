@@ -31,3 +31,6 @@ zavu/**/.zavu/credentials.json
 
 .claude
 .agents
+
+CLAUDE.md 
+AGENTS.md 
