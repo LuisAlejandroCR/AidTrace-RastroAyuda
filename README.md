@@ -58,7 +58,7 @@ Try the live demo: [aidtrace-rastroayuda.vercel.app](https://aidtrace-rastroayud
 Send a short text message. The first number is the batch code; words after the action are details.
 
 ```text
-CELO1 depositar 100 aguas refugio mayor
+CELO1 depositar 100 cajas refugio mayor
 CELO1 entregar 15 kits refugio mayor
 CELO1 recoger centro de acopio norte
 CELO1 revisar faltan 3 cajas
