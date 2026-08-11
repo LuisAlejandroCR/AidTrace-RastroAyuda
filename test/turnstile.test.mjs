@@ -86,11 +86,12 @@ test("rejects when the visitor hostname is not in the allowlist", async () => {
   }
 });
 
-test("skips hostname check when no allowlist is configured (empty allowedHostnames)", async () => {
+test("defaults to the production hostname allowlist when no env is configured (fail-closed)", async () => {
   const restore = mockFetch({ success: true, action: "relay", hostname: "any.domain.example" });
   try {
     const result = await verifyTurnstileToken({ secret: "abc123", token: "valid-token" });
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, false);
+    assert.equal(result.error, "hostname_mismatch");
   } finally {
     restore();
   }

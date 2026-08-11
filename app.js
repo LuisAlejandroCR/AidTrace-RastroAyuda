@@ -1486,11 +1486,16 @@ async function copyRelayerAddress() {
     ta.style.position = "fixed";
     ta.style.opacity = "0";
     document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    ta.setSelectionRange(0, ta.value.length);
-    copied = document.execCommand("copy");
-    document.body.removeChild(ta);
+    try {
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      copied = document.execCommand("copy");
+    } catch {
+      copied = false;
+    } finally {
+      document.body.removeChild(ta);
+    }
   }
   notify(copied ? t("supportCopied") : t("supportCopyFailed"));
 }
