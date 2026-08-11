@@ -75,7 +75,7 @@ The bot replies with a Celoscan link:
 
 ```text
 Registrado en Celo: DELIVER AT-CELO-1
-Detalles: 100 aguas refugio mayor
+Detalles: 100 cajas refugio mayor
 Tx: https://celoscan.io/tx/<tx_hash>
 ```
 
