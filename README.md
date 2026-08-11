@@ -144,12 +144,12 @@ sw.js                       Service worker cache and background sync handoff
 qrcode.js                   Local QR generator
 assets/icons/*.png          PWA install icons
 api/zavu.mjs                Browser relay endpoint and Zavu Telegram webhook
-api/header-probe.mjs        Temporary-safe webhook header probe for Zavu setup
 api/process-queue.mjs       Protected queue worker that processes one Supabase queued Celo write per call
 api/timeline.mjs            Celo timeline reader with Supabase index fallback
 api/relayer-status.mjs      Public relayer wallet balance for the support card (GET /api/relayer-status)
 AidTraceLedger.sol          On-chain proof ledger
 scripts/send-zavu-message.mjs Outbound channel smoke test
+scripts/relayer-alert.mjs     Balance watchdog — Telegram alert when relayer proofs left drop below threshold
 scripts/relayer-rotation.md Relayer key rotation and emergency revocation runbook
 scripts/webhook-token-setup.md Zavu inbound webhook token setup and rollback runbook
 scripts/final-demo-check.ps1 Final local + deployed endpoint smoke checks
@@ -199,6 +199,15 @@ AIDTRACE_RELAYER_ADDRESS=<relayer public address; defaults to the live relayer>
 ```
 
 The public `GET /api/relayer-status` endpoint returns the relayer CELO balance, current gas price, and an estimated proofs-left count so the support card can show live funding status.
+
+Optional relayer alert (GitHub):
+
+```text
+Repository variable:  AIDTRACE_ALERT_THRESHOLD (default 50 proofs left)
+Repository secrets:  RASTROAYUDA_ZAVU_API_KEY, AIDTRACE_CENTER_NOTIFY_CHAT
+```
+
+`.github/workflows/relayer-alert.yml` checks `/api/relayer-status` every 6 hours and sends a Telegram alert through Zavu when the estimated proofs left drops below the threshold, so the relayer is never silently out of gas again.
 
 Optional timeline index env:
 
@@ -280,6 +289,7 @@ Supabase queue setup:
 Run supabase/aidtrace_queue.sql in the Supabase SQL editor before wiring queue-backed processing.
 Run supabase/aidtrace_relay_guard.sql in the Supabase SQL editor before enabling browser relay idempotency/rate limiting.
 Run supabase/aidtrace_timeline.sql in the Supabase SQL editor before using indexed timeline reads.
+Run supabase/security_hardening.sql LAST — revokes EXECUTE on every SECURITY DEFINER RPC from the anon key so the public cannot enqueue/complete/register rows directly.
 ```
 
 Optional webhook hardening:

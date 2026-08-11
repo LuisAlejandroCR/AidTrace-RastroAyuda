@@ -1,0 +1,36 @@
+name: Relayer Balance Alert
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aidtrace-relayer-alert
+  cancel-in-progress: false
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      AIDTRACE_APP_URL: ${{ vars.AIDTRACE_APP_URL || 'https://aidtrace-rastroayuda.vercel.app' }}
+      AIDTRACE_ALERT_THRESHOLD: ${{ vars.AIDTRACE_ALERT_THRESHOLD || '50' }}
+      RASTROAYUDA_ZAVU_API_KEY: ${{ secrets.RASTROAYUDA_ZAVU_API_KEY }}
+      AIDTRACE_CENTER_NOTIFY_CHAT: ${{ secrets.AIDTRACE_CENTER_NOTIFY_CHAT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: npm ci
+        run: npm ci
+
+      - name: Check relayer balance and alert when low
+        run: node scripts/relayer-alert.mjs

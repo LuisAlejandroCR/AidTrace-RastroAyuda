@@ -166,6 +166,7 @@ const translations = {
     supportStatusOk: "healthy",
     supportStatusLow: "low",
     supportStatusEmpty: "needs funds",
+    supportPrintDonate: "Support these Celo records with CELO:",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -305,6 +306,7 @@ const translations = {
     supportStatusOk: "saludable",
     supportStatusLow: "bajo",
     supportStatusEmpty: "sin fondos",
+    supportPrintDonate: "Apoya estos registros en Celo con CELO:",
   },
 };
 
@@ -556,6 +558,7 @@ function printQrPdf(batchId, link) {
           svg { width: 220px; height: 220px; }
           h1 { font-size: 24px; margin: 0 0 8px; }
           p { overflow-wrap: anywhere; }
+          .donate { font-size: 11px; color: #555; margin-top: 12px; }
         </style>
       </head>
       <body>
@@ -564,6 +567,7 @@ function printQrPdf(batchId, link) {
           ${qrSvg(link)}
           <h2>${safeBatchId}</h2>
           <p>${safeLink}</p>
+          <p class="donate">${t("supportPrintDonate")} ${escapeHtml(RELAYER_ADDRESS)}</p>
         </div>
         <script>window.onload = () => { window.print(); };</script>
       </body>
