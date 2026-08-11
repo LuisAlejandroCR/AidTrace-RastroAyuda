@@ -1,4 +1,4 @@
-const CACHE = "aidtrace-v17";
+const CACHE = "aidtrace-v18";
 const DB_NAME = "aidtrace-sync-db";
 const STORE = "packets";
 const ASSETS = [
@@ -28,12 +28,12 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event.data?.type !== "AIDTRACE_SYNC") return;
-  event.waitUntil(savePacket(event.data).then(flushPackets));
+  event.waitUntil(savePacket(event.data).then(flushPackets).catch(() => {}));
 });
 
 self.addEventListener("sync", (event) => {
   if (event.tag === "aidtrace-sync") {
-    event.waitUntil(flushPackets());
+    event.waitUntil(flushPackets().catch(() => {}));
   }
 });
 
@@ -71,6 +71,10 @@ async function flushPackets() {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(packet.packet),
   });
+  if (response.status === 401 || response.status === 403) {
+    db.close();
+    return false;
+  }
   if (!response.ok) {
     db.close();
     throw new Error(`Relay failed: ${response.status}`);

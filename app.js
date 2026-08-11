@@ -162,11 +162,16 @@ const translations = {
     supportWalletPaste: "Address copied - paste it in your wallet",
     supportOtherWallet: "Other",
     supportFundingTitle: "How to fund the wallet (no crypto experience)",
-    fundStep1: "Easiest: ask a friend or coworker who uses crypto to send 1-5 CELO or USDC to this address - scan the QR or use the buttons above.",
-    fundStep2: "Buy on an exchange (Binance, Kraken, Coinbase or a local one): buy CELO or USDC, then withdraw to this address. Always pick the Celo network (CELO / 42220), never Ethereum.",
-    fundStep3: "No bank card? Use P2P: Binance P2P, Noones or similar let you buy crypto with bank transfer, cash or mobile money.",
-    fundStep4: "Small amounts are enough: each proof costs about 0.1 CELO (a few cents). 5 CELO funds dozens of proofs.",
-    fundStep5: "If you only have USDC on another network, bridge it with Allbridge or Ubeswap - or simply withdraw from an exchange to Celo.",
+    fundStep1: "Buy CELO on an exchange (<a href=\"https://www.kraken.com/prices/celo\" target=\"_blank\" rel=\"noreferrer\">Kraken</a>, Binance, Coinbase, local) and withdraw to this address - always pick the Celo network (42220), never Ethereum.",
+    fundStep2: "No bank card? Buy crypto P2P with cash, transfer or mobile money: <a href=\"https://p2p.binance.com/en\" target=\"_blank\" rel=\"noreferrer\">Binance P2P</a> or <a href=\"https://noones.com\" target=\"_blank\" rel=\"noreferrer\">Noones</a>.",
+    fundStep3: "Easiest: ask a friend with crypto to scan the QR, or bridge any USDC with <a href=\"https://app.allbridge.io/\" target=\"_blank\" rel=\"noreferrer\">Allbridge</a>. Small amounts are enough - ~0.1 CELO per proof.",
+    privyConnect: "Send with any wallet",
+    privyUnavailable: "Wallet payments are not configured on this deployment.",
+    privyFailed: "Could not connect the wallet. Try again.",
+    privyConnected: "connected",
+    privySending: "Confirm the transaction in your wallet.",
+    privySent: "Thanks! Your contribution will appear in the balance below.",
+    privyCancelled: "Transaction cancelled.",
     supportCopied: "Copied!",
     supportViewOnChain: "View on Celoscan",
     supportBalance: "Relayer balance",
@@ -181,6 +186,7 @@ const translations = {
     verifyIntro: "To help keep AidTrace free of fake submissions, we'll verify your email.",
     verifyEmail: "Email",
     verifySendCode: "Send verification code",
+    verifyTooMany: "Too many requests - wait 60 seconds before trying again.",
     verifyCodeSent: "Code sent. Check your email.",
     verifyOtp: "6-digit code",
     verifyOtpHint: "Code expires in 10 minutes.",
@@ -326,11 +332,16 @@ const translations = {
     supportWalletPaste: "Direccion copiada - pega la en tu billetera",
     supportOtherWallet: "Otra",
     supportFundingTitle: "Como fondear la billetera (sin experiencia en cripto)",
-    fundStep1: "Lo mas facil: pide a un amigo o companero que use cripto que envie 1-5 CELO o USDC a esta direccion - escanea el QR o usa los botones de arriba.",
-    fundStep2: "Compra en un exchange (Binance, Kraken, Coinbase o uno local): compra CELO o USDC y retira a esta direccion. Siempre elige la red Celo (CELO / 42220), nunca Ethereum.",
-    fundStep3: "Sin tarjeta bancaria? Usa P2P: Binance P2P, Noones u otros permiten comprar cripto con transferencia, efectivo o dinero movil.",
-    fundStep4: "Con montos pequenos basta: cada prueba cuesta ~0.1 CELO (centavos). 5 CELO fondean docenas de pruebas.",
-    fundStep5: "Si solo tienes USDC en otra red, puentealo con Allbridge o Ubeswap - o retira desde un exchange a Celo.",
+    fundStep1: "Compra CELO en un exchange (<a href=\"https://www.kraken.com/prices/celo\" target=\"_blank\" rel=\"noreferrer\">Kraken</a>, Binance, Coinbase, local) y retira a esta direccion - siempre elige la red Celo (42220), nunca Ethereum.",
+    fundStep2: "Sin tarjeta? Compra cripto P2P con efectivo, transferencia o dinero movil: <a href=\"https://p2p.binance.com/es\" target=\"_blank\" rel=\"noreferrer\">Binance P2P</a> o <a href=\"https://noones.com\" target=\"_blank\" rel=\"noreferrer\">Noones</a>.",
+    fundStep3: "Mas facil: pide a un amigo con cripto que escanee el QR, o puentea cualquier USDC con <a href=\"https://app.allbridge.io/\" target=\"_blank\" rel=\"noreferrer\">Allbridge</a>. Con montos pequenos basta - ~0.1 CELO por prueba.",
+    privyConnect: "Enviar con cualquier billetera",
+    privyUnavailable: "Los pagos con billetera no estan configurados en este despliegue.",
+    privyFailed: "No se pudo conectar la billetera. Intenta de nuevo.",
+    privyConnected: "conectada",
+    privySending: "Confirma la transaccion en tu billetera.",
+    privySent: "Gracias! Tu contribucion aparecera en el saldo de abajo.",
+    privyCancelled: "Transaccion cancelada.",
     supportCopied: "¡Copiado!",
     supportViewOnChain: "Ver en Celoscan",
     supportBalance: "Saldo del relayer",
@@ -345,6 +356,7 @@ const translations = {
     verifyIntro: "Para mantener AidTrace libre de reportes falsos, verificaremos tu correo.",
     verifyEmail: "Correo",
     verifySendCode: "Enviar codigo de verificacion",
+    verifyTooMany: "Demasiadas solicitudes - espera 60 segundos antes de intentar de nuevo.",
     verifyCodeSent: "Codigo enviado. Revisa tu correo.",
     verifyOtp: "Codigo de 6 digitos",
     verifyOtpHint: "El codigo expira en 10 minutos.",
@@ -1515,6 +1527,95 @@ $("supportAddress")?.addEventListener("click", copyRelayerAddress);
 document.querySelectorAll(".wallet-btn").forEach((btn) =>
   btn.addEventListener("click", () => openRelayerWallet(btn.dataset.wallet)),
 );
+
+// ── Privy wallet funding (optional, feature-flagged via /api/config) ──────────
+let privyProvider = null;
+const RELAYER_AMOUNT_WEI = {
+  "0.5": "0x6F05B59D3B20000",
+  "1": "0xDE0B6B3A7640000",
+  "5": "0x4563918244F40000",
+};
+
+function loadPrivyScript() {
+  return new Promise((resolve) => {
+    if (window.PrivyProvider) return resolve();
+    if (document.getElementById("privy-script")) {
+      const tries = setInterval(() => {
+        if (window.PrivyProvider) {
+          clearInterval(tries);
+          resolve();
+        }
+      }, 200);
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "privy-script";
+    script.src = "https://cdn.privy.io/privy-browser.js";
+    script.async = true;
+    script.onload = () => resolve();
+    document.head.appendChild(script);
+  });
+}
+
+async function ensurePrivy() {
+  const config = await loadVerifyConfig();
+  if (!verifyState.config?.privyAppId) {
+    $("privyStatus").textContent = t("privyUnavailable");
+    return false;
+  }
+  await loadPrivyScript();
+  if (!privyProvider) {
+    privyProvider = new window.PrivyProvider({
+      appId: verifyState.config.privyAppId,
+      config: {
+        embeddedWallets: { createOnLogin: "off" },
+        defaultChain: { id: 42220, name: "Celo" },
+      },
+    });
+  }
+  return true;
+}
+
+function shortAddress(addr) {
+  return addr ? `${addr.slice(0, 6)}\u2026${addr.slice(-4)}` : "";
+}
+
+async function connectPrivyWallet() {
+  $("privyStatus").textContent = "";
+  if (!(await ensurePrivy())) return;
+  try {
+    await privyProvider.authenticate();
+    const user = privyProvider.getAuthenticatedUser();
+    const wallet = user?.wallets?.[0];
+    if (!wallet) throw new Error("no wallet");
+    $("privyConnectBtn").hidden = true;
+    $("privyActive").hidden = false;
+    $("privyWalletAddr").textContent = `${shortAddress(wallet.address)} (${t("privyConnected")})`;
+  } catch {
+    $("privyStatus").textContent = t("privyFailed");
+  }
+}
+
+async function sendToRelayer(amount) {
+  if (!privyProvider) return;
+  const wei = RELAYER_AMOUNT_WEI[String(amount)] || RELAYER_AMOUNT_WEI["1"];
+  $("privyStatus").textContent = t("privySending");
+  try {
+    await privyProvider.request({
+      method: "eth_sendTransaction",
+      params: [{ to: RELAYER_ADDRESS, value: wei }],
+    });
+    $("privyStatus").textContent = t("privySent");
+    loadSupportBalance();
+  } catch {
+    $("privyStatus").textContent = t("privyCancelled");
+  }
+}
+
+$("privyConnectBtn")?.addEventListener("click", connectPrivyWallet);
+document.querySelectorAll("[data-privy-amount]").forEach((btn) =>
+  btn.addEventListener("click", () => sendToRelayer(btn.dataset.privyAmount)),
+);
 $("supportOverlay")?.addEventListener("click", (event) => {
   if (event.target === $("supportOverlay")) closeSupport();
 });
@@ -1655,6 +1756,23 @@ function saveVerifySession(session) {
   verifyState.session = session;
 }
 
+function startVerifyCooldown(btn, seconds) {
+  if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+  btn.disabled = true;
+  let left = seconds;
+  btn.textContent = `${left}s`;
+  const timer = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(timer);
+      btn.disabled = false;
+      btn.textContent = btn.dataset.label;
+    } else {
+      btn.textContent = `${left}s`;
+    }
+  }, 1000);
+}
+
 async function loadVerifyConfig() {
   if (verifyState.config) return verifyState.config;
   try {
@@ -1788,6 +1906,10 @@ async function sendVerifyCode() {
       },
       body: JSON.stringify({ email, create_user: true }),
     });
+    if (response.status === 429) {
+      $("verifyStatus").textContent = t("verifyTooMany");
+      return;
+    }
     if (!response.ok) throw new Error(String(response.status));
     $("verifyStatus").textContent = t("verifyCodeSent");
     $("verifyStepEmail").hidden = true;
@@ -1834,7 +1956,12 @@ async function confirmVerifyCode() {
 
 document.addEventListener("DOMContentLoaded", () => {
   const sendBtn = $("verifySendCode");
-  if (sendBtn) sendBtn.addEventListener("click", sendVerifyCode);
+  if (sendBtn) {
+    sendBtn.addEventListener("click", () => {
+      sendVerifyCode();
+      startVerifyCooldown(sendBtn, 60);
+    });
+  }
   const confirmBtn = $("verifyConfirm");
   if (confirmBtn) confirmBtn.addEventListener("click", confirmVerifyCode);
   const closeBtn = $("verifyClose");
@@ -1843,19 +1970,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (resendBtn) {
     resendBtn.addEventListener("click", () => {
       sendVerifyCode();
-      let seconds = 42;
-      resendBtn.disabled = true;
-      resendBtn.textContent = `${seconds}s`;
-      const timer = setInterval(() => {
-        seconds--;
-        if (seconds <= 0) {
-          clearInterval(timer);
-          resendBtn.disabled = false;
-          resendBtn.textContent = t("verifyResend");
-        } else {
-          resendBtn.textContent = `${seconds}s`;
-        }
-      }, 1000);
+      startVerifyCooldown(resendBtn, 60);
     });
   }
   $("verifyOtp")?.addEventListener("keydown", (event) => {

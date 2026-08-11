@@ -277,6 +277,18 @@
           <button class="wallet-btn" type="button" data-wallet="coinbase"><span class="wallet-dot wl-coinbase"></span>Coinbase</button>
           <button class="wallet-btn" type="button" data-wallet="other"><span class="wallet-dot wl-other"></span><span data-i18n="supportOtherWallet">Other</span></button>
         </div>
+        <div class="support-privy">
+          <button id="privyConnectBtn" class="primary compact" type="button" data-i18n="privyConnect">Send with any wallet</button>
+          <div id="privyActive" class="privy-active" hidden>
+            <p class="privy-wallet-addr" id="privyWalletAddr"></p>
+            <div class="privy-amount-row">
+              <button class="secondary compact" type="button" data-privy-amount="0.5">0.5 CELO</button>
+              <button class="secondary compact" type="button" data-privy-amount="1">1 CELO</button>
+              <button class="secondary compact" type="button" data-privy-amount="5">5 CELO</button>
+            </div>
+          </div>
+          <p id="privyStatus" class="verify-hint"></p>
+        </div>
         <details class="support-funding">
           <summary data-i18n="supportFundingTitle">How to fund the wallet (no crypto experience)</summary>
           <ol id="supportFundingSteps" class="support-funding-steps"></ol>

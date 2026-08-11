@@ -38,8 +38,10 @@ export default function handler(req, res) {
   const siteKey = process.env.AIDTRACE_TURNSTILE_SITE_KEY || "";
   const supabaseUrl = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
   const anonKey = process.env.SUPABASE_ANON_KEY || "";
+  const privyAppId = process.env.PRIVY_APP_ID || "";
 
   if (siteKey) config.turnstileSiteKey = siteKey;
+  if (privyAppId) config.privyAppId = privyAppId;
   if (supabaseUrl && anonKey) {
     config.supabaseUrl = supabaseUrl;
     config.supabaseAnonKey = anonKey;

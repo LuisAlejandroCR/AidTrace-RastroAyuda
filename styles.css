@@ -1445,6 +1445,32 @@ dd {
 .wl-coinbase { background: #0052ff; }
 .wl-other { background: #9aa4b2; }
 
+.support-privy {
+  margin-top: 12px;
+}
+
+.privy-active {
+  margin-top: 8px;
+}
+
+.privy-wallet-addr {
+  font-size: 0.78rem;
+  font-weight: 650;
+  color: var(--sage-dark);
+  margin-bottom: 6px;
+}
+
+.privy-amount-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.privy-amount-row .secondary {
+  margin-top: 0;
+}
+
 .support-funding {
   margin-top: 14px;
   text-align: left;
