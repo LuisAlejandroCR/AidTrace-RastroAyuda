@@ -15,7 +15,7 @@
     <meta name="twitter:description" content="Tamper-evident aid supply tracking on Celo. No wallet needed." />
     <meta name="twitter:image" content="https://aidtrace-rastroayuda.vercel.app/assets/icons/icon-512.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=4" />
+    <link rel="stylesheet" href="./styles.css?v=5" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
   </head>
   <body>
@@ -263,32 +263,12 @@
         <span class="demo-icon">💚</span>
         <h3 class="demo-title" data-i18n="supportTitle">Support the Celo relayer</h3>
         <p class="demo-body" data-i18n="supportBody">Every proof on Celo pays a small network fee. Donations keep the relayer wallet funded so field teams keep recording verified custody events.</p>
-        <div id="supportQr" class="support-qr" aria-hidden="true"></div>
-        <p class="support-address-head" data-i18n="supportAddress">Relayer wallet</p>
         <div class="support-address-row">
           <code id="supportAddress" class="support-address" title="Click to copy"></code>
           <button id="supportCopy" class="secondary compact" type="button" data-i18n="supportCopy">Copy address</button>
         </div>
-        <p class="support-address-head" data-i18n="supportWalletsTitle">Open in your wallet</p>
-        <div class="support-wallet-row">
-          <button class="wallet-btn" type="button" data-wallet="metamask"><span class="wallet-dot wl-metamask"></span>MetaMask</button>
-          <button class="wallet-btn" type="button" data-wallet="rabby"><span class="wallet-dot wl-rabby"></span>Rabby</button>
-          <button class="wallet-btn" type="button" data-wallet="trust"><span class="wallet-dot wl-trust"></span>Trust</button>
-          <button class="wallet-btn" type="button" data-wallet="coinbase"><span class="wallet-dot wl-coinbase"></span>Coinbase</button>
-          <button class="wallet-btn" type="button" data-wallet="other"><span class="wallet-dot wl-other"></span><span data-i18n="supportOtherWallet">Other</span></button>
-        </div>
         <div id="privyConnectSection" class="support-privy" hidden>
-          <button id="privyConnectBtn" class="primary compact" type="button" data-i18n="privyConnect">Continue with a wallet</button>
-          <div id="privyActive" class="privy-active" hidden>
-            <p class="privy-wallet-addr" id="privyWalletAddr"></p>
-            <div class="privy-amount-row">
-              <button class="secondary compact" type="button" data-privy-amount="0.5">0.5 CELO</button>
-              <button class="secondary compact" type="button" data-privy-amount="1">1 CELO</button>
-              <button class="secondary compact" type="button" data-privy-amount="5">5 CELO</button>
-            </div>
-          </div>
-          <p id="privyStatus" class="verify-hint"></p>
-          <p class="privy-branding" data-i18n="privyProtectedBy">Protected by Privy</p>
+          <div id="privyReactRoot"></div>
         </div>
         <details class="support-funding">
           <summary data-i18n="supportFundingTitle">How to fund the wallet (no crypto experience)</summary>
@@ -307,6 +287,6 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="./qrcode.js"></script>
-    <script src="./app.js?v=4"></script>
+    <script src="./app.js?v=5"></script>
   </body>
 </html>
