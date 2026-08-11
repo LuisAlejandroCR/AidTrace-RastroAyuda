@@ -1802,8 +1802,12 @@ async function confirmVerifyCode() {
   const config = await loadVerifyConfig();
   if (!config) return;
   const email = $("verifyEmail").value.trim();
-  const token = $("verifyOtp").value.trim();
+  const token = $("verifyOtp").value.replace(/\D/g, "");
   $("verifyStatus").textContent = "";
+  if (!token) {
+    $("verifyStatus").textContent = t("verifyError");
+    return;
+  }
   try {
     const response = await fetch(`${config.supabaseUrl}/auth/v1/verify`, {
       method: "POST",
