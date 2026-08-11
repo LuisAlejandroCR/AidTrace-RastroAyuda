@@ -177,12 +177,8 @@ AIDTRACE_APP_URL=https://aidtrace-rastroayuda.vercel.app (repository variable)
 3. Run `npm.cmd run test` and `npm.cmd run check`.
 4. Open a pull request explaining the problem, the solution, and how it was validated.
 
-## Contributors
-
-- [LuisAlejandroCR](https://github.com/LuisAlejandroCR)
-
 ---
 
 <p align="center">
-  Built on <strong>Celo Mainnet</strong> · AidTrace | RastroAyuda
+  Built on <strong>Celo Mainnet</strong> · AidTrace | RastroAyuda for https://build4latam.com/en/p/aidtrace
 </p>
