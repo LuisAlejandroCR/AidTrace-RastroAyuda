@@ -58,7 +58,7 @@ Try the live demo: [aidtrace-rastroayuda.vercel.app](https://aidtrace-rastroayud
 Send a short text message. The first number is the batch code; words after the action are details.
 
 ```text
-CELO1 depositar 100 aguas refugio mayor
+CELO1 depositar 100 cajas refugio mayor
 CELO1 entregar 15 kits refugio mayor
 CELO1 recoger centro de acopio norte
 CELO1 revisar faltan 3 cajas
@@ -75,7 +75,7 @@ The bot replies with a Celoscan link:
 
 ```text
 Registrado en Celo: DELIVER AT-CELO-1
-Detalles: 100 aguas refugio mayor
+Detalles: 100 cajas refugio mayor
 Tx: https://celoscan.io/tx/<tx_hash>
 ```
 
@@ -88,7 +88,7 @@ Tx: https://celoscan.io/tx/<tx_hash>
 Example public memo:
 
 ```text
-zavu:<message_id> | DELIVER AT-CELO-1 | 100 aguas refugio mayor
+zavu:<message_id> | DELIVER AT-CELO-1 | 100 cajas refugio mayor
 ```
 
 ## Works Offline
