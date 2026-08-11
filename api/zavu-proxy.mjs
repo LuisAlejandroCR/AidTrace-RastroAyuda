@@ -27,8 +27,6 @@ const WEBHOOK_TOKEN  = process.env.AIDTRACE_WEBHOOK_TOKEN || "";
 const APP_URL        = (process.env.AIDTRACE_APP_URL || "").replace(/\/$/, "");
 
 function verifyZavuSignature(req) {
-  if (!WEBHOOK_SECRET) return true;
-
   const msgId        = String(req.headers["svix-id"]        || "");
   const msgTimestamp = String(req.headers["svix-timestamp"] || "");
   const msgSignature = String(req.headers["svix-signature"] || "");
@@ -56,12 +54,19 @@ export default async function handler(req, res) {
     return res.status(405).send("Method not allowed");
   }
 
+  if (!WEBHOOK_SECRET) {
+    return res.status(503).json({ ok: false, error: "Webhook secret not configured" });
+  }
+
+  if (!APP_URL) {
+    return res.status(503).json({ ok: false, error: "AIDTRACE_APP_URL not configured" });
+  }
+
   if (!verifyZavuSignature(req)) {
     return res.status(401).json({ ok: false, error: "Invalid webhook signature" });
   }
 
-  const host   = APP_URL || `https://${req.headers.host}`;
-  const target = `${host}/api/zavu`;
+  const target = `${APP_URL}/api/zavu`;
 
   let upstream;
   try {

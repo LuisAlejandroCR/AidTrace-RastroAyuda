@@ -56,7 +56,10 @@ async function enqueueSupabase({ contactId, chatId, channel, phone, batchId, eve
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Supabase env vars missing');
 
-  const msgId = `invent:${channel}:${contactId}:${batchId}:${Date.now()}`;
+  const providerMessageId = body.message_id || body.id;
+  const msgId = providerMessageId
+    ? `invent:${String(providerMessageId).slice(0, 120)}`
+    : `invent:${channel}:${contactId}:${batchId}:${eventType}:${details.slice(0, 120)}`;
   const r = await fetch(`${url}/rest/v1/rpc/enqueue_aidtrace_message`, {
     method: 'POST',
     headers: {
@@ -83,45 +86,7 @@ async function enqueueSupabase({ contactId, chatId, channel, phone, batchId, eve
 }
 
 async function writeToCelo({ batchId, eventType, details, referenceURI }) {
-  // Dynamic import so the module-level crash cannot happen
-  const viem = await import('viem');
-  const viemAccounts = await import('viem/accounts');
-  const viemChains = await import('viem/chains');
-
-  const pk = process.env.RASTROAYUDA_RELAYER_PRIVATE_KEY;
-  const addr = process.env.AIDTRACE_CONTRACT;
-  if (!pk || !addr) throw new Error('Relayer env vars not configured');
-
-  const account = viemAccounts.privateKeyToAccount(
-    pk.startsWith('0x') ? pk : `0x${pk}`
-  );
-
-  const ABI = [{
-    name: 'recordEvent', type: 'function', stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'batchId',      type: 'string' },
-      { name: 'eventType',    type: 'string' },
-      { name: 'details',      type: 'string' },
-      { name: 'referenceURI', type: 'string' },
-    ],
-    outputs: [],
-  }];
-
-  const data = viem.encodeFunctionData({
-    abi: ABI, functionName: 'recordEvent',
-    args: [batchId, eventType, details, referenceURI],
-  });
-
-  const wallet = viem.createWalletClient({
-    account, chain: viemChains.celo, transport: viem.http(),
-  });
-  const pubClient = viem.createPublicClient({
-    chain: viemChains.celo, transport: viem.http(),
-  });
-
-  const hash = await wallet.sendTransaction({ to: addr, data });
-  await pubClient.waitForTransactionReceipt({ hash, confirmations: 1 });
-  return hash;
+  void batchId; void eventType; void details; void referenceURI;
 }
 
 export default async function handler(req, res) {
@@ -133,13 +98,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Use POST, not ' + req.method });
   }
 
-  // Auth
+  // Auth — fail closed: the webhook must be configured with a shared token
   const envToken = process.env.AIDTRACE_INVENT_WEBHOOK_TOKEN;
-  if (envToken) {
-    const sent =
-      req.headers['x-aidtrace-invent-token'] ||
-      (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
-    if (sent !== envToken) return res.status(401).json({ error: 'Unauthorized' });
+  if (!envToken) {
+    return res.status(503).json({ error: 'Invent webhook token not configured' });
+  }
+  const sent =
+    req.headers['x-aidtrace-invent-token'] ||
+    (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '');
+  if (typeof sent !== 'string' || sent !== envToken) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   // Parse body
@@ -167,7 +135,8 @@ export default async function handler(req, res) {
     });
   }
 
-  const { batchId, eventType, details } = parsed;
+  const { batchId, eventType, details: rawDetails } = parsed;
+  const details = String(rawDetails || '').slice(0, 500);
   const referenceURI = `invent:${channel}:${contactId} | ${eventType} ${batchId} | ${details}`;
 
   const useQueue =
@@ -175,30 +144,21 @@ export default async function handler(req, res) {
     !!process.env.SUPABASE_URL &&
     !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  if (!useQueue) {
+    return res.status(503).json({ ok: false, error: 'Queue not configured' });
+  }
+
   try {
-    if (useQueue) {
-      await enqueueSupabase({ contactId, chatId, channel, phone, batchId, eventType, details, referenceURI });
-      return res.status(200).json({
-        ok: true, queued: true,
-        batch_id: batchId, event_type: eventType, details,
-        reply: `En cola: ${eventType} ${batchId}\n${details}\nCelo en ~1 min.`,
-      });
-    }
-
-    const txHash = await writeToCelo({ batchId, eventType, details, referenceURI });
+    await enqueueSupabase({ contactId, chatId, channel, phone, batchId, eventType, details, referenceURI });
     return res.status(200).json({
-      ok: true, queued: false, tx_hash: txHash,
+      ok: true, queued: true,
       batch_id: batchId, event_type: eventType, details,
-      reply:
-        `Registrado en Celo: ${eventType} ${batchId}\n` +
-        `${details}\n` +
-        `Tx: https://celoscan.io/tx/${txHash}`,
+      reply: `En cola: ${eventType} ${batchId}\n${details}\nCelo en ~1 min.`,
     });
-
   } catch (err) {
     console.error('[invent]', err.message);
     return res.status(500).json({
-      ok: false, error: err.message,
+      ok: false, error: 'Invent message failed',
       reply: 'Error interno. Intenta en 1 minuto.',
     });
   }

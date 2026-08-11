@@ -147,6 +147,7 @@ api/zavu.mjs                Browser relay endpoint and Zavu Telegram webhook
 api/header-probe.mjs        Temporary-safe webhook header probe for Zavu setup
 api/process-queue.mjs       Protected queue worker that processes one Supabase queued Celo write per call
 api/timeline.mjs            Celo timeline reader with Supabase index fallback
+api/relayer-status.mjs      Public relayer wallet balance for the support card (GET /api/relayer-status)
 AidTraceLedger.sol          On-chain proof ledger
 scripts/send-zavu-message.mjs Outbound channel smoke test
 scripts/relayer-rotation.md Relayer key rotation and emergency revocation runbook
@@ -190,6 +191,14 @@ RASTROAYUDA_ZAVU_API_KEY=<zv_live_...>
 SUPABASE_URL=<project url>
 SUPABASE_SERVICE_ROLE_KEY=<service role key>
 ```
+
+Optional relay status env:
+
+```text
+AIDTRACE_RELAYER_ADDRESS=<relayer public address; defaults to the live relayer>
+```
+
+The public `GET /api/relayer-status` endpoint returns the relayer CELO balance, current gas price, and an estimated proofs-left count so the support card can show live funding status.
 
 Optional timeline index env:
 

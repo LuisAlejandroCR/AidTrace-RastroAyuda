@@ -13,6 +13,8 @@ const COORDINATOR_TOKEN_KEY = "aidtrace_coordinator_token";
 const ONLINE_RELOAD_KEY = "aidtrace_reloaded_after_online";
 const TIMELINE_FETCH_LIMIT = 100;
 const TIMELINE_PAGE_SIZE = 10;
+const RELAYER_ADDRESS = "0x3dbb8633cbB45db718B8D72F14AE36E151695181";
+const SUPPORT_STATUS_ENDPOINT = `${APP_ORIGIN}/api/relayer-status`;
 let pendingGps = null;
 let mapInstance = null;
 let mapLayerGroup = null;
@@ -150,6 +152,20 @@ const translations = {
     demoNext: "Next →",
     demoStart: "Get started",
     demoSkip: "Skip",
+    supportButton: "Support ♡",
+    supportTitle: "Support the Celo relayer",
+    supportBody: "Every proof on Celo pays a small network fee. Donations keep the relayer wallet funded so field teams keep recording verified custody events.",
+    supportAddress: "Relayer wallet",
+    supportCopy: "Copy address",
+    supportCopied: "Copied!",
+    supportViewOnChain: "View on Celoscan",
+    supportBalance: "Relayer balance",
+    supportNote: "Any amount helps — every CELO funds hundreds of on-chain proofs.",
+    supportProofsUnit: "proofs left",
+    supportLoading: "checking…",
+    supportStatusOk: "healthy",
+    supportStatusLow: "low",
+    supportStatusEmpty: "needs funds",
   },
   es: {
     eyebrow: "Seguimiento offline de ayuda en Celo",
@@ -275,6 +291,20 @@ const translations = {
     demoNext: "Siguiente →",
     demoStart: "Comenzar",
     demoSkip: "Omitir",
+    supportButton: "Apoyar ♡",
+    supportTitle: "Apoya al relayer en Celo",
+    supportBody: "Cada prueba en Celo paga una tarifa de red. Las donaciones mantienen con fondos la billetera del relayer para que los equipos sigan registrando eventos verificados.",
+    supportAddress: "Billetera del relayer",
+    supportCopy: "Copiar direccion",
+    supportCopied: "¡Copiado!",
+    supportViewOnChain: "Ver en Celoscan",
+    supportBalance: "Saldo del relayer",
+    supportNote: "Cualquier monto ayuda: cada CELO financia cientos de pruebas en cadena.",
+    supportProofsUnit: "pruebas restantes",
+    supportLoading: "consultando…",
+    supportStatusOk: "saludable",
+    supportStatusLow: "bajo",
+    supportStatusEmpty: "sin fondos",
   },
 };
 
@@ -1280,6 +1310,106 @@ $("gpsBtn")?.addEventListener("click", captureGps);
 $("languageToggle").addEventListener("click", () => {
   state.language = state.language === "en" ? "es" : "en";
   saveState();
+});
+
+// Relayer support card — donation address, QR, and live balance
+let supportRefreshTimer = null;
+
+function renderSupportBalance(status) {
+  const value = $("supportBalanceValue");
+  const proofs = $("supportProofs");
+  const dot = $("supportDot");
+  if (!status) {
+    if (value) value.textContent = t("supportLoading");
+    if (proofs) proofs.textContent = "";
+    if (dot) dot.dataset.level = "";
+    return;
+  }
+  const balanceCelo = Number(status.balanceCelo || 0);
+  const proofsLeft = Number(status.estProofsLeft || 0);
+  if (value) value.textContent = `${balanceCelo.toFixed(4)} CELO`;
+  if (proofs) proofs.textContent = `≈ ${proofsLeft} ${t("supportProofsUnit")}`;
+  let level = proofsLeft > 0 ? "ok" : "crit";
+  if (proofsLeft > 0 && proofsLeft < 10) level = "warn";
+  if (dot) {
+    dot.dataset.level = level;
+    dot.title = {
+      ok: t("supportStatusOk"),
+      warn: t("supportStatusLow"),
+      crit: t("supportStatusEmpty"),
+    }[level];
+  }
+}
+
+async function loadSupportBalance() {
+  if (!navigator.onLine || !SUPPORT_STATUS_ENDPOINT) {
+    renderSupportBalance(null);
+    return;
+  }
+  try {
+    const response = await fetch(SUPPORT_STATUS_ENDPOINT, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`Status failed: ${response.status}`);
+    const status = await response.json();
+    if (status?.ok) {
+      const explorer = $("supportExplorerLink");
+      if (explorer && status.addressUrl) explorer.href = status.addressUrl;
+      renderSupportBalance(status);
+      return;
+    }
+    throw new Error("Status unavailable");
+  } catch {
+    renderSupportBalance(null);
+  }
+}
+
+function openSupport() {
+  const overlay = $("supportOverlay");
+  if (!overlay) return;
+  renderSupportQr();
+  const address = $("supportAddress");
+  if (address && !address.textContent) address.textContent = RELAYER_ADDRESS;
+  overlay.classList.remove("is-hidden");
+  loadSupportBalance();
+  clearInterval(supportRefreshTimer);
+  supportRefreshTimer = setInterval(loadSupportBalance, 60000);
+}
+
+function closeSupport() {
+  $("supportOverlay")?.classList.add("is-hidden");
+  clearInterval(supportRefreshTimer);
+  supportRefreshTimer = null;
+}
+
+function renderSupportQr() {
+  const box = $("supportQr");
+  if (!box || box.dataset.rendered) return;
+  box.innerHTML = qrSvg(RELAYER_ADDRESS);
+  box.dataset.rendered = "1";
+}
+
+async function copyRelayerAddress() {
+  try {
+    await navigator.clipboard.writeText(RELAYER_ADDRESS);
+  } catch {
+    $("supportAddress")?.select?.();
+    document.execCommand("copy");
+  }
+  notify(t("supportCopied"));
+}
+
+$("supportBtn")?.addEventListener("click", openSupport);
+$("supportClose")?.addEventListener("click", closeSupport);
+$("supportCopy")?.addEventListener("click", copyRelayerAddress);
+$("supportOverlay")?.addEventListener("click", (event) => {
+  if (event.target === $("supportOverlay")) closeSupport();
+});
+document.addEventListener("keydown", (event) => {
+  const overlay = $("supportOverlay");
+  if (event.key === "Escape" && overlay && !overlay.classList.contains("is-hidden")) {
+    closeSupport();
+  }
 });
 
 window.addEventListener("online", async () => {

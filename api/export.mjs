@@ -19,10 +19,11 @@ const CELOSCAN_TX  = process.env.CELOSCAN_TX_BASE || "https://celoscan.io/tx";
 
 function escapeCSV(value) {
   const str = String(value == null ? "" : value);
-  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-    return `"${str.replace(/"/g, '""')}"`;
+  const scrubbed = /^[=+\-@]/.test(str) ? `'${str}` : str;
+  if (scrubbed.includes(",") || scrubbed.includes('"') || scrubbed.includes("\n")) {
+    return `"${scrubbed.replace(/"/g, '""')}"`;
   }
-  return str;
+  return scrubbed;
 }
 
 function rowToCSV(row) {

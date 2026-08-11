@@ -30,22 +30,59 @@ const SUPABASE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const zavu = new Zavudev({ apiKey: process.env.RASTROAYUDA_ZAVU_API_KEY });
 
 function isAuthorized(req) {
-  if (!SECRET) return true;
+  if (!SECRET) return "not_configured";
   const bearer = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  return bearer === SECRET;
+  return bearer === SECRET ? true : false;
+}
+
+const ALLOWED_CENTER_ACTIONS = new Set(["DELIVERED", "DELIVER", "ARRIVED"]);
+
+function validateDelivery(body) {
+  const centerCode = String(body.centerCode || "").toUpperCase();
+  const batchId    = String(body.batchId || "").slice(0, 64);
+  const actionType = String(body.actionType || "DELIVERED").toUpperCase().slice(0, 40);
+  const details    = String(body.details || "").slice(0, 500);
+  const txHash     = body.txHash ? String(body.txHash) : null;
+
+  if (!/^[A-Z0-9-]{2,40}$/.test(centerCode)) {
+    throw new Error("Invalid centerCode");
+  }
+  if (!/^[A-Z0-9-]{1,64}$/.test(batchId)) {
+    throw new Error("Invalid batchId");
+  }
+  if (!ALLOWED_CENTER_ACTIONS.has(actionType)) {
+    throw new Error("Invalid actionType");
+  }
+  if (txHash && !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
+    throw new Error("Invalid txHash");
+  }
+
+  return { centerCode, batchId, actionType, details, txHash };
 }
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(204).end();
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
-  if (!isAuthorized(req)) return res.status(401).json({ ok: false, error: "Unauthorized" });
+  const auth = isAuthorized(req);
+  if (auth === "not_configured") {
+    return res.status(503).json({ ok: false, error: "Center webhook secret not configured" });
+  }
+  if (!auth) return res.status(401).json({ ok: false, error: "Unauthorized" });
 
   const body = req.body || {};
   if (body.event !== "center.delivery") {
     return res.status(200).json({ ok: true, skipped: true });
   }
 
-  const { centerCode, batchId, actionType, details, txHash } = body;
+  let validated;
+  try {
+    validated = validateDelivery(body);
+  } catch (err) {
+    console.warn("[center-webhook] rejected invalid delivery:", err.message);
+    return res.status(400).json({ ok: false, error: err.message });
+  }
+
+  const { centerCode, batchId, actionType, details, txHash } = validated;
   console.info("[center-webhook] received:", centerCode, batchId, actionType);
 
   // Record the delivery in Supabase so center-inventory reflects it.
