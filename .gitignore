@@ -34,3 +34,9 @@ zavu/**/.zavu/credentials.json
 
 CLAUDE.md 
 AGENTS.md 
+
+docs/
+
+AUDIT_BLOCKS.md
+
+scripts/*.md
