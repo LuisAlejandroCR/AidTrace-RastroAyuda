@@ -1,5 +1,5 @@
 import Zavudev from "@zavudev/sdk";
-import { randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual, createHash } from "node:crypto";
 import {
   createPublicClient,
   createWalletClient,
@@ -12,6 +12,8 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { celo } from "viem/chains";
 import { parseAidTraceText } from "../lib/aidtrace-parser.mjs";
+import { verifyTurnstileToken } from "../lib/turnstile.mjs";
+import { verifyAccessToken } from "../lib/supabase-auth.mjs";
 
 const CONTRACT_ADDRESS =
   process.env.AIDTRACE_CONTRACT || "0xaf5c40e82ac9255479a1f447e81992b71c4f4934";
@@ -46,6 +48,10 @@ const QUEUE_ENABLED = process.env.AIDTRACE_QUEUE_ENABLED === "true";
 const BROWSER_QUEUE_ENABLED = process.env.AIDTRACE_BROWSER_QUEUE_ENABLED === "true";
 const BROWSER_RELAY_GUARD_ENABLED = process.env.AIDTRACE_BROWSER_RELAY_GUARD_ENABLED === "true";
 const BROWSER_RELAY_RATE_LIMIT = Number(process.env.AIDTRACE_BROWSER_RELAY_RATE_LIMIT || "30");
+const TURNSTILE_SECRET_KEY = process.env.AIDTRACE_TURNSTILE_SECRET_KEY || "";
+const TRUST_ENABLED = process.env.AIDTRACE_TRUST_ENABLED === "true";
+const REQUIRE_AUTH = process.env.AIDTRACE_REQUIRE_AUTH === "true";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const QUEUE_WORKER_ID = process.env.AIDTRACE_QUEUE_WORKER_ID || "aidtrace-vercel-worker";
 const QUEUE_PROCESS_ON_INBOUND = process.env.AIDTRACE_QUEUE_PROCESS_ON_INBOUND !== "false";
 const QUEUE_INBOUND_PROCESS_LIMIT = Math.max(1, Number(process.env.AIDTRACE_QUEUE_INBOUND_PROCESS_LIMIT || "2"));
@@ -538,6 +544,37 @@ function relayEventToParsed(event) {
   };
 }
 
+async function recordTrustEvidence(item, parsed, txHash) {
+  if (!TRUST_ENABLED || !hasSupabaseQueue()) return null;
+
+  const canonical = JSON.stringify({
+    id: item.id,
+    batchId: parsed.batchId,
+    actionType: parsed.actionType,
+    note: item.note,
+    locationText: item.locationText,
+    senderName: item.senderName,
+    ref: item.ref,
+  });
+  const evidenceHash = createHash("sha256").update(canonical).digest("hex");
+
+  try {
+    const rows = await supabaseRpc("record_aidtrace_report_evidence", {
+      p_batch_id: parsed.batchId,
+      p_action_type: parsed.actionType,
+      p_details: parsed.details,
+      p_author_id: null,
+      p_evidence_sha256: evidenceHash,
+      p_evidence_ref: `browser:${item.id}`,
+      p_tx_hash: txHash,
+    });
+    return Array.isArray(rows) ? rows[0] || null : rows;
+  } catch (error) {
+    console.warn("[trust] evidence record failed:", error.message);
+    return null;
+  }
+}
+
 async function handleBrowserRelay(packet, req, res) {
   try {
     validateBrowserRelayPacket(packet);
@@ -553,6 +590,31 @@ async function handleBrowserRelay(packet, req, res) {
   const requesterIp = requestIp(req);
   const deviceId = typeof packet.deviceId === "string" ? packet.deviceId.slice(0, 64) : null;
   const relayGuardEnabled = hasBrowserRelayGuard();
+
+  if (TURNSTILE_SECRET_KEY) {
+    const challenge = await verifyTurnstileToken({
+      secret: TURNSTILE_SECRET_KEY,
+      token: typeof packet.turnstileToken === "string" ? packet.turnstileToken : "",
+      remoteIp: requesterIp,
+    });
+    if (!challenge.ok) {
+      console.warn("Turnstile verification failed:", challenge.error);
+      return res.status(403).json({ ok: false, error: "Bot check failed" });
+    }
+  }
+
+  let verifiedAuthor = null;
+  if (REQUIRE_AUTH && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    verifiedAuthor = await verifyAccessToken({
+      token: typeof packet.accessToken === "string" ? packet.accessToken : "",
+      supabaseUrl: SUPABASE_URL,
+      anonKey: SUPABASE_ANON_KEY,
+    });
+    if (!verifiedAuthor) {
+      console.warn("Browser relay rejected: missing or invalid access token");
+      return res.status(401).json({ ok: false, error: "Verification required" });
+    }
+  }
 
   for (const item of pending) {
     let guardStarted = false;
@@ -645,12 +707,18 @@ async function handleBrowserRelay(packet, req, res) {
         ),
       );
 
-      recorded.push({
+      const record = {
         id: item.id,
         batchId: parsed.batchId,
         actionType: parsed.actionType,
         txHash: result.txHash,
-      });
+      };
+      const trust = await recordTrustEvidence(item, parsed, result.txHash);
+      if (trust) {
+        record.reportId = trust.report_id;
+        record.evidenceDuplicate = Boolean(trust.duplicate_evidence);
+      }
+      recorded.push(record);
       emitCenterDelivery({ batchId: parsed.batchId, actionType: parsed.actionType, details: parsed.details, locationText: item.locationText, txHash: result.txHash }).catch(() => {});
 
       if (guardStarted) {

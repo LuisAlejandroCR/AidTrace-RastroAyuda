@@ -145,6 +145,7 @@ Optional: `AIDTRACE_RELAYER_ADDRESS` (defaults to live relayer), `AIDTRACE_WEBHO
 supabase/aidtrace_queue.sql
 supabase/aidtrace_relay_guard.sql
 supabase/aidtrace_timeline.sql
+supabase/aidtrace_trust.sql          (anti-troll: trust schema + RLS + evidence hashing)
 supabase/security_hardening.sql   (LAST — locks down SECURITY DEFINER RPCs)
 ```
 
