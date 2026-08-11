@@ -157,6 +157,16 @@ const translations = {
     supportBody: "Every proof on Celo pays a small network fee. Donations keep the relayer wallet funded so field teams keep recording verified custody events.",
     supportAddress: "Relayer wallet",
     supportCopy: "Copy address",
+    supportCopyFailed: "Could not copy - select the address and copy manually",
+    supportWalletsTitle: "Open in your wallet",
+    supportWalletPaste: "Address copied - paste it in your wallet",
+    supportOtherWallet: "Other",
+    supportFundingTitle: "How to fund the wallet (no crypto experience)",
+    fundStep1: "Easiest: ask a friend or coworker who uses crypto to send 1-5 CELO or USDC to this address - scan the QR or use the buttons above.",
+    fundStep2: "Buy on an exchange (Binance, Kraken, Coinbase or a local one): buy CELO or USDC, then withdraw to this address. Always pick the Celo network (CELO / 42220), never Ethereum.",
+    fundStep3: "No bank card? Use P2P: Binance P2P, Noones or similar let you buy crypto with bank transfer, cash or mobile money.",
+    fundStep4: "Small amounts are enough: each proof costs about 0.1 CELO (a few cents). 5 CELO funds dozens of proofs.",
+    fundStep5: "If you only have USDC on another network, bridge it with Allbridge or Ubeswap - or simply withdraw from an exchange to Celo.",
     supportCopied: "Copied!",
     supportViewOnChain: "View on Celoscan",
     supportBalance: "Relayer balance",
@@ -311,6 +321,16 @@ const translations = {
     supportBody: "Cada prueba en Celo paga una tarifa de red. Las donaciones mantienen con fondos la billetera del relayer para que los equipos sigan registrando eventos verificados.",
     supportAddress: "Billetera del relayer",
     supportCopy: "Copiar direccion",
+    supportCopyFailed: "No se pudo copiar - selecciona la direccion y copia manualmente",
+    supportWalletsTitle: "Abrir en tu billetera",
+    supportWalletPaste: "Direccion copiada - pega la en tu billetera",
+    supportOtherWallet: "Otra",
+    supportFundingTitle: "Como fondear la billetera (sin experiencia en cripto)",
+    fundStep1: "Lo mas facil: pide a un amigo o companero que use cripto que envie 1-5 CELO o USDC a esta direccion - escanea el QR o usa los botones de arriba.",
+    fundStep2: "Compra en un exchange (Binance, Kraken, Coinbase o uno local): compra CELO o USDC y retira a esta direccion. Siempre elige la red Celo (CELO / 42220), nunca Ethereum.",
+    fundStep3: "Sin tarjeta bancaria? Usa P2P: Binance P2P, Noones u otros permiten comprar cripto con transferencia, efectivo o dinero movil.",
+    fundStep4: "Con montos pequenos basta: cada prueba cuesta ~0.1 CELO (centavos). 5 CELO fondean docenas de pruebas.",
+    fundStep5: "Si solo tienes USDC en otra red, puentealo con Allbridge o Ubeswap - o retira desde un exchange a Celo.",
     supportCopied: "¡Copiado!",
     supportViewOnChain: "Ver en Celoscan",
     supportBalance: "Saldo del relayer",
@@ -1412,6 +1432,7 @@ function openSupport() {
   const overlay = $("supportOverlay");
   if (!overlay) return;
   renderSupportQr();
+  renderFundingSteps();
   const address = $("supportAddress");
   if (address && !address.textContent) address.textContent = RELAYER_ADDRESS;
   overlay.classList.remove("is-hidden");
@@ -1434,18 +1455,66 @@ function renderSupportQr() {
 }
 
 async function copyRelayerAddress() {
+  const text = RELAYER_ADDRESS;
+  let copied = false;
   try {
-    await navigator.clipboard.writeText(RELAYER_ADDRESS);
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    }
   } catch {
-    $("supportAddress")?.select?.();
-    document.execCommand("copy");
+    copied = false;
   }
-  notify(t("supportCopied"));
+  if (!copied) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    copied = document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+  notify(copied ? t("supportCopied") : t("supportCopyFailed"));
+}
+
+function walletOpenLink(wallet) {
+  if (wallet === "metamask") return `https://metamask.app.link/send/${RELAYER_ADDRESS}?chainId=celo`;
+  if (wallet === "trust") return `https://link.trustwallet.com/send?coin=celo&address=${RELAYER_ADDRESS}`;
+  return "";
+}
+
+function openRelayerWallet(wallet) {
+  const link = walletOpenLink(wallet);
+  if (link) {
+    window.open(link, "_blank", "noopener");
+    return;
+  }
+  copyRelayerAddress();
+  const home = wallet === "rabby" ? "https://rabby.io/" : "https://www.coinbase.com/wallet";
+  window.open(home, "_blank", "noopener");
+  notify(t("supportWalletPaste"));
+}
+
+function renderFundingSteps() {
+  const list = $("supportFundingSteps");
+  if (!list || list.dataset.rendered) return;
+  list.dataset.rendered = "1";
+  list.innerHTML = [t("fundStep1"), t("fundStep2"), t("fundStep3"), t("fundStep4"), t("fundStep5")]
+    .map((step) => `<li>${step}</li>`)
+    .join("");
 }
 
 $("supportBtn")?.addEventListener("click", openSupport);
 $("supportClose")?.addEventListener("click", closeSupport);
 $("supportCopy")?.addEventListener("click", copyRelayerAddress);
+$("supportAddress")?.addEventListener("click", copyRelayerAddress);
+document.querySelectorAll(".wallet-btn").forEach((btn) =>
+  btn.addEventListener("click", () => openRelayerWallet(btn.dataset.wallet)),
+);
 $("supportOverlay")?.addEventListener("click", (event) => {
   if (event.target === $("supportOverlay")) closeSupport();
 });

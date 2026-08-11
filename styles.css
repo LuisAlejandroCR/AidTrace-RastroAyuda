@@ -1405,6 +1405,67 @@ dd {
   margin-top: 6px;
 }
 
+.support-wallet-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.wallet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: #1d2b27;
+  cursor: pointer;
+}
+
+.wallet-btn:hover {
+  border-color: var(--sage-dark);
+}
+
+.wallet-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.wl-metamask { background: #f6851b; }
+.wl-rabby { background: #6b4cff; }
+.wl-trust { background: #0500ff; }
+.wl-coinbase { background: #0052ff; }
+.wl-other { background: #9aa4b2; }
+
+.support-funding {
+  margin-top: 14px;
+  text-align: left;
+  font-size: 0.8rem;
+}
+
+.support-funding summary {
+  cursor: pointer;
+  font-weight: 750;
+  color: var(--sage-dark);
+}
+
+.support-funding-steps {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
+.support-funding-steps li {
+  margin-bottom: 6px;
+}
+
 .support-address-row {
   display: flex;
   align-items: center;

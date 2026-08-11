@@ -266,9 +266,21 @@
         <div id="supportQr" class="support-qr" aria-hidden="true"></div>
         <p class="support-address-head" data-i18n="supportAddress">Relayer wallet</p>
         <div class="support-address-row">
-          <code id="supportAddress" class="support-address"></code>
+          <code id="supportAddress" class="support-address" title="Click to copy"></code>
           <button id="supportCopy" class="secondary compact" type="button" data-i18n="supportCopy">Copy address</button>
         </div>
+        <p class="support-address-head" data-i18n="supportWalletsTitle">Open in your wallet</p>
+        <div class="support-wallet-row">
+          <button class="wallet-btn" type="button" data-wallet="metamask"><span class="wallet-dot wl-metamask"></span>MetaMask</button>
+          <button class="wallet-btn" type="button" data-wallet="rabby"><span class="wallet-dot wl-rabby"></span>Rabby</button>
+          <button class="wallet-btn" type="button" data-wallet="trust"><span class="wallet-dot wl-trust"></span>Trust</button>
+          <button class="wallet-btn" type="button" data-wallet="coinbase"><span class="wallet-dot wl-coinbase"></span>Coinbase</button>
+          <button class="wallet-btn" type="button" data-wallet="other"><span class="wallet-dot wl-other"></span><span data-i18n="supportOtherWallet">Other</span></button>
+        </div>
+        <details class="support-funding">
+          <summary data-i18n="supportFundingTitle">How to fund the wallet (no crypto experience)</summary>
+          <ol id="supportFundingSteps" class="support-funding-steps"></ol>
+        </details>
         <a id="supportExplorerLink" class="support-explorer" href="https://celoscan.io/address/0x3dbb8633cbB45db718B8D72F14AE36E151695181" target="_blank" rel="noreferrer" data-i18n="supportViewOnChain">View on Celoscan</a>
         <div class="support-balance" id="supportBalancePanel">
           <span class="support-dot" id="supportDot"></span>
