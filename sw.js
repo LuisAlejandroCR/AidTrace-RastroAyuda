@@ -1,4 +1,4 @@
-const CACHE = "aidtrace-v19";
+const CACHE = "aidtrace-v20";
 const DB_NAME = "aidtrace-sync-db";
 const STORE = "packets";
 const ASSETS = [

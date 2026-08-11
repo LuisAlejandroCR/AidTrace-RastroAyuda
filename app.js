@@ -165,6 +165,15 @@ const translations = {
     fundStep1: "Exchange: buy CELO on <a href=\"https://www.kraken.com/prices/celo\" target=\"_blank\" rel=\"noreferrer\">Kraken</a>, Binance, or Coinbase and withdraw to this address on the Celo network (42220).",
     fundStep2: "No card? P2P with cash or mobile money via <a href=\"https://p2p.binance.com/en\" target=\"_blank\" rel=\"noreferrer\">Binance P2P</a> or <a href=\"https://noones.com\" target=\"_blank\" rel=\"noreferrer\">Noones</a>.",
     fundStep3: "Already have crypto elsewhere? Bridge it with <a href=\"https://app.allbridge.io/\" target=\"_blank\" rel=\"noreferrer\">Allbridge</a>. ~0.1 CELO covers a proof.",
+    privyConnect: "Continue with a wallet",
+    privyConnecting: "Confirm the connection in your wallet…",
+    privyNoWallet: "No wallet extension found. Open this page inside your wallet app's browser, or use one of the buttons above.",
+    privyConnected: "connected",
+    privySending: "Confirm the transaction in your wallet…",
+    privySent: "Thanks! Your contribution will appear in the balance below.",
+    privyFailed: "Could not connect the wallet. Try again.",
+    privyCancelled: "Transaction cancelled.",
+    privyProtectedBy: "Protected by Privy",
     supportCopied: "Copied!",
     supportViewOnChain: "View on Celoscan",
     supportBalance: "Relayer balance",
@@ -328,6 +337,15 @@ const translations = {
     fundStep1: "Exchange: compra CELO en <a href=\"https://www.kraken.com/prices/celo\" target=\"_blank\" rel=\"noreferrer\">Kraken</a>, Binance o Coinbase y retira a esta direccion en la red Celo (42220).",
     fundStep2: "Sin tarjeta? P2P con efectivo o dinero movil via <a href=\"https://p2p.binance.com/es\" target=\"_blank\" rel=\"noreferrer\">Binance P2P</a> o <a href=\"https://noones.com\" target=\"_blank\" rel=\"noreferrer\">Noones</a>.",
     fundStep3: "Ya tienes cripto en otra red? Puentea con <a href=\"https://app.allbridge.io/\" target=\"_blank\" rel=\"noreferrer\">Allbridge</a>. ~0.1 CELO cubre una prueba.",
+    privyConnect: "Continuar con una billetera",
+    privyConnecting: "Confirma la conexion en tu billetera…",
+    privyNoWallet: "No se encontro una extension de billetera. Abre esta pagina desde el navegador de tu app de billetera, o usa uno de los botones de arriba.",
+    privyConnected: "conectada",
+    privySending: "Confirma la transaccion en tu billetera…",
+    privySent: "Gracias! Tu contribucion aparecera en el saldo de abajo.",
+    privyFailed: "No se pudo conectar la billetera. Intenta de nuevo.",
+    privyCancelled: "Transaccion cancelada.",
+    privyProtectedBy: "Protegido por Privy",
     supportCopied: "¡Copiado!",
     supportViewOnChain: "Ver en Celoscan",
     supportBalance: "Saldo del relayer",
@@ -1439,6 +1457,9 @@ function openSupport() {
   loadSupportBalance();
   clearInterval(supportRefreshTimer);
   supportRefreshTimer = setInterval(loadSupportBalance, 60000);
+  loadVerifyConfig().then((config) => {
+    $("privyConnectSection").hidden = !config?.privyAppId;
+  });
 }
 
 function closeSupport() {
@@ -1542,6 +1563,69 @@ $("supportCopy")?.addEventListener("click", copyRelayerAddress);
 $("supportAddress")?.addEventListener("click", copyRelayerAddress);
 document.querySelectorAll(".wallet-btn").forEach((btn) =>
   btn.addEventListener("click", () => openRelayerWallet(btn.dataset.wallet)),
+);
+
+// ── Privy wallet connect (external wallet via SIWE, real @privy-io/js-sdk-core) ──
+const PRIVY_AMOUNT_WEI = {
+  "0.5": "0x6f05b59d3b20000",
+  "1": "0xde0b6b3a7640000",
+  "5": "0x4563918244f40000",
+};
+let privyWidgetPromise = null;
+
+function loadPrivyWidget() {
+  if (window.AidTracePrivy) return Promise.resolve(window.AidTracePrivy);
+  if (privyWidgetPromise) return privyWidgetPromise;
+  privyWidgetPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "./privy-widget.bundle.js";
+    script.onload = () => resolve(window.AidTracePrivy);
+    script.onerror = () => reject(new Error("Failed to load wallet widget"));
+    document.head.appendChild(script);
+  });
+  return privyWidgetPromise;
+}
+
+async function connectPrivyWallet() {
+  const status = $("privyStatus");
+  status.textContent = t("privyConnecting");
+  try {
+    const config = await loadVerifyConfig();
+    const widget = await loadPrivyWidget();
+    if (!widget.hasInjectedWallet()) {
+      status.textContent = t("privyNoWallet");
+      return;
+    }
+    const { address } = await widget.connectWallet({
+      appId: config.privyAppId,
+      clientId: config.privyClientId,
+    });
+    status.textContent = "";
+    $("privyConnectBtn").hidden = true;
+    $("privyActive").hidden = false;
+    $("privyWalletAddr").textContent = `${address.slice(0, 6)}…${address.slice(-4)} (${t("privyConnected")})`;
+  } catch {
+    status.textContent = t("privyFailed");
+  }
+}
+
+async function sendPrivyDonation(amount) {
+  const status = $("privyStatus");
+  status.textContent = t("privySending");
+  try {
+    const widget = await loadPrivyWidget();
+    const valueWei = PRIVY_AMOUNT_WEI[String(amount)] || PRIVY_AMOUNT_WEI["1"];
+    await widget.sendDonation({ to: RELAYER_ADDRESS, valueWei });
+    status.textContent = t("privySent");
+    loadSupportBalance();
+  } catch {
+    status.textContent = t("privyCancelled");
+  }
+}
+
+$("privyConnectBtn")?.addEventListener("click", connectPrivyWallet);
+document.querySelectorAll("[data-privy-amount]").forEach((btn) =>
+  btn.addEventListener("click", () => sendPrivyDonation(btn.dataset.privyAmount)),
 );
 
 $("supportOverlay")?.addEventListener("click", (event) => {

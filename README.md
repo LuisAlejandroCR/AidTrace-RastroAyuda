@@ -141,7 +141,7 @@ Optional: `AIDTRACE_RELAYER_ADDRESS` (defaults to live relayer), `AIDTRACE_WEBHO
 
 Optional anti-troll hardening — when set, field devices must pass a Cloudflare Turnstile widget and/or an email OTP before their proofs are accepted: `AIDTRACE_TURNSTILE_SITE_KEY` + `AIDTRACE_TURNSTILE_SECRET_KEY`, `SUPABASE_ANON_KEY`, `AIDTRACE_REQUIRE_AUTH=true`. Optional Turnstile hardening: `AIDTRACE_TURNSTILE_ACTION` (default `relay`), `AIDTRACE_TURNSTILE_HOSTNAMES` (comma-separated hostname allowlist checked by siteverify — set to your production domain, never `localhost`).
 
-Relayer wallet funding has no server config — the Support (♡) modal shows the address, a QR code, wallet deep links (MetaMask/Trust/Rabby/Coinbase), and P2P/exchange links (Kraken, Binance P2P, Noones, Allbridge) to fund it directly.
+Relayer wallet funding: the Support (♡) modal always shows the address, a QR code, wallet deep links (MetaMask/Trust/Rabby/Coinbase), and P2P/exchange links (Kraken, Binance P2P, Noones, Allbridge). Optionally, `PRIVY_APP_ID` (+ `PRIVY_CLIENT_ID`, from the [Privy dashboard](https://dashboard.privy.io/)) enables a "Continue with a wallet" button that connects an injected wallet via Privy's SIWE flow and sends preset amounts (0.5/1/5 CELO) directly — hidden automatically when unset. This uses the real `@privy-io/js-sdk-core` package ([docs](https://docs.privy.io/recipes/core-js)); Privy has no CDN/script-tag build, so the widget is pre-bundled with esbuild and committed as `privy-widget.bundle.js`. After changing `src/privy-widget.js`, run `npm run build:privy` and commit the updated bundle — Vercel does not run a build step for it.
 
 **Supabase SQL setup** — run in order in the Supabase SQL editor:
 

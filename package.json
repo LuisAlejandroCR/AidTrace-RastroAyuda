@@ -1,11 +1,16 @@
 {
   "scripts": {
     "test": "node --test",
-    "check": "node --check api/zavu.mjs && node --check api/process-queue.mjs && node --check api/timeline.mjs && node --check api/zavu-proxy.mjs && node --check api/invent.mjs && node --check api/center-inventory.mjs && node --check api/center-webhook.mjs && node --check api/export.mjs && node --check api/queue-status.mjs && node --check api/retry-queue.mjs && node --check api/relayer-status.mjs && node --check api/config.mjs && node --check lib/aidtrace-parser.mjs && node --check lib/timeline-parser.mjs && node --check lib/invent-notify.mjs && node --check lib/turnstile.mjs && node --check lib/supabase-auth.mjs && node --check app.js"
+    "check": "node --check api/zavu.mjs && node --check api/process-queue.mjs && node --check api/timeline.mjs && node --check api/zavu-proxy.mjs && node --check api/invent.mjs && node --check api/center-inventory.mjs && node --check api/center-webhook.mjs && node --check api/export.mjs && node --check api/queue-status.mjs && node --check api/retry-queue.mjs && node --check api/relayer-status.mjs && node --check api/config.mjs && node --check lib/aidtrace-parser.mjs && node --check lib/timeline-parser.mjs && node --check lib/invent-notify.mjs && node --check lib/turnstile.mjs && node --check lib/supabase-auth.mjs && node --check app.js",
+    "build:privy": "esbuild src/privy-widget.js --bundle --format=iife --platform=browser --outfile=privy-widget.bundle.js"
   },
   "dependencies": {
+    "@privy-io/js-sdk-core": "^0.69.0",
     "@zavudev/sdk": "^0.46.0",
     "express": "^5.2.1",
     "viem": "^2.53.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }
